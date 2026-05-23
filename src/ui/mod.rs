@@ -1,13 +1,34 @@
 pub mod dashboard;
+pub mod file_browser;
 pub mod issues;
+pub mod notes;
 pub mod popup;
 pub mod prs;
+pub mod roadmap;
+pub mod stats;
 
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::Frame;
+
+pub fn keybinds_bar(frame: &mut Frame, area: Rect, screen: &str, input_mode: &str) {
+    let binds = match (screen, input_mode) {
+        ("dashboard", _) => " [a]dd project  [d]elete  [s]tats  [t] roadmap  [enter] open  [q]uit",
+        ("issues", "none") => " [c]reate issue  [e]dit  [Tab] focus  [x] toggle  [o] comment  [n]ote  [L] link note  [p] PRs  [/] search  [s]tats  [t] roadmap  [r] refresh  [q] back  [Q] quit",
+        ("issues", "edit") => " [Tab] switch field  [Ctrl+S] save  [Esc] cancel",
+        ("prs", "none") => " [c]reate PR  [m]erge  [o] comment  [i] issues  [/] search  [s]tats  [t] roadmap  [r] refresh  [q] back  [Q] quit",
+        ("notes", "none") => " [n]ew note  [enter] open  [d]elete  [q] back  [Q] quit",
+        _ => "",
+    };
+    let style = Style::default()
+        .bg(Color::DarkGray)
+        .fg(Color::White)
+        .add_modifier(Modifier::BOLD);
+    let msg = Paragraph::new(Line::from(Span::styled(binds, style)));
+    frame.render_widget(msg, area);
+}
 
 pub fn status_bar(frame: &mut Frame, area: Rect, text: &str, repo_info: Option<&str>) {
     let layout = Layout::default()

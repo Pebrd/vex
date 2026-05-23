@@ -26,8 +26,7 @@ impl Dashboard {
             .constraints([
                 Constraint::Length(3),
                 Constraint::Min(1),
-                Constraint::Length(1),
-            ])
+        ])
             .split(area);
 
         let title = Paragraph::new(Line::from(Span::styled(
@@ -74,10 +73,6 @@ impl Dashboard {
 
         frame.render_stateful_widget(list, layout[1], &mut list_state);
 
-        let hint = Paragraph::new(Line::from(Span::styled(
-            " [a]dd project  [enter] open  [q]uit  [/] filter  [d]elete",
-            Style::default().fg(Color::DarkGray),
-        )));
-        frame.render_widget(hint, layout[2]);
+
     }
 }

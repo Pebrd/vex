@@ -1,4 +1,5 @@
-use crate::github::Issue;
+use crate::notes::Note;
+use crate::github::{Comment, Issue};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -12,6 +13,21 @@ pub struct IssuesView {
     pub filter_label: Option<String>,
 }
 
+#[derive(PartialEq, Clone, Copy)]
+pub enum FocusTarget {
+    Issues,
+    Notes,
+}
+
+#[derive(Clone)]
+pub struct EditState {
+    pub title: String,
+    pub body: String,
+    pub field_focus: u8,
+    pub issue_number: u64,
+    pub note_slug: Option<String>,
+}
+
 impl IssuesView {
     pub fn new(issues: Vec<Issue>) -> Self {
         Self {
@@ -22,26 +38,53 @@ impl IssuesView {
         }
     }
 
-    pub fn draw(&self, frame: &mut Frame, area: Rect, detail_issue: Option<&Issue>) {
-        let layout = if detail_issue.is_some() {
-            Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Ratio(2, 5), Constraint::Ratio(3, 5)])
-                .split(area)
-        } else {
-            Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Min(1), Constraint::Length(0)])
-                .split(area)
-        };
+    pub fn draw(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        detail_issue: Option<&Issue>,
+        comments: Option<&[Comment]>,
+        notes: &[Note],
+        note_selected: usize,
+        focus: FocusTarget,
+        editing: Option<&EditState>,
+    ) {
+        let layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Ratio(2, 5), Constraint::Ratio(3, 5)])
+            .split(area);
 
+        let left_panels = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+            .split(layout[0]);
+
+        self.draw_issues_list(frame, left_panels[0], focus == FocusTarget::Issues);
+        self.draw_notes_list(frame, left_panels[1], notes, note_selected, focus == FocusTarget::Notes);
+
+        if let Some(editing) = editing {
+            self.draw_detail_editing(frame, layout[1], editing);
+        } else if let Some(issue) = detail_issue {
+            self.draw_detail(frame, layout[1], issue, comments.unwrap_or(&[]));
+        } else if focus == FocusTarget::Notes {
+            if let Some(note) = notes.get(note_selected) {
+                self.draw_note_detail(frame, layout[1], note);
+            }
+        }
+    }
+
+    fn draw_issues_list(&self, frame: &mut Frame, area: Rect, is_active: bool) {
+        let border_style = if is_active {
+            Style::default().fg(Color::Cyan)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
         let block = Block::default()
             .borders(Borders::ALL)
             .title(" Issues ")
-            .style(Style::default().fg(Color::Cyan));
-        let inner = block.inner(layout[0]);
-
-        frame.render_widget(block, layout[0]);
+            .style(border_style);
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
 
         let items: Vec<ListItem> = self
             .issues
@@ -82,22 +125,158 @@ impl IssuesView {
         let mut list_state = ListState::default();
         list_state.select(Some(self.selected));
 
+        let highlight = if is_active {
+            Style::default()
+                .bg(Color::DarkGray)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+
         let list = List::new(items)
-            .highlight_style(
-                Style::default()
-                    .bg(Color::DarkGray)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .highlight_symbol("> ");
+            .highlight_style(highlight)
+            .highlight_symbol(if is_active { "> " } else { "  " });
 
         frame.render_stateful_widget(list, inner, &mut list_state);
-
-        if let Some(issue) = detail_issue {
-            self.draw_detail(frame, layout[1], issue);
-        }
     }
 
-    fn draw_detail(&self, frame: &mut Frame, area: Rect, issue: &Issue) {
+    fn draw_notes_list(&self, frame: &mut Frame, area: Rect, notes: &[Note], selected: usize, is_active: bool) {
+        let border_style = if is_active {
+            Style::default().fg(Color::Cyan)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(" Notes ")
+            .style(border_style);
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        let items: Vec<ListItem> = notes
+            .iter()
+            .map(|n| {
+                let priority_style = match n.priority.as_str() {
+                    "high" => Style::default().fg(Color::Red),
+                    "medium" => Style::default().fg(Color::Yellow),
+                    _ => Style::default().fg(Color::Blue),
+                };
+                let status_icon = if n.status == "open" { " " } else { " " };
+
+                let mut spans = vec![
+                    Span::styled(status_icon, priority_style),
+                    Span::raw(&n.title),
+                    Span::raw(" "),
+                    Span::styled(
+                        match n.priority.as_str() {
+                            "high" => "↑",
+                            "medium" => "–",
+                            _ => "↓",
+                        },
+                        priority_style,
+                    ),
+                ];
+
+                if let Some(num) = n.issue {
+                    spans.push(Span::raw(" "));
+                    spans.push(Span::styled(
+                        format!("#{num}"),
+                        Style::default().fg(Color::Magenta),
+                    ));
+                }
+
+                ListItem::new(Line::from(spans))
+            })
+            .collect();
+
+        let mut list_state = ListState::default();
+        list_state.select(Some(selected));
+
+        let highlight = if is_active {
+            Style::default()
+                .bg(Color::DarkGray)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+
+        let list = List::new(items)
+            .highlight_style(highlight)
+            .highlight_symbol(if is_active { "> " } else { "  " });
+
+        frame.render_stateful_widget(list, inner, &mut list_state);
+    }
+
+    fn draw_detail_editing(&self, frame: &mut Frame, area: Rect, editing: &EditState) {
+        let is_note = editing.note_slug.is_some();
+        let title_text = if is_note {
+            " Editing Note ".to_string()
+        } else {
+            format!(" Editing Issue #{} ", editing.issue_number)
+        };
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(title_text)
+            .style(Style::default().fg(Color::Yellow));
+        let inner = block.inner(area);
+
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3),
+                Constraint::Min(1),
+                Constraint::Length(1),
+            ])
+            .split(inner);
+
+        let title_style = if editing.field_focus == 0 {
+            Style::default().bg(Color::DarkGray).fg(Color::White)
+        } else {
+            Style::default().fg(Color::White)
+        };
+        let title_ptr = if editing.field_focus == 0 { "▶ " } else { "  " };
+        let title_block = Block::default()
+            .title(format!("{title_ptr}Title"))
+            .borders(Borders::ALL)
+            .style(title_style);
+        let mut title_spans: Vec<Span> = vec![Span::raw(&editing.title)];
+        if editing.field_focus == 0 {
+            title_spans.push(Span::styled("|", Style::default().fg(Color::Cyan)));
+        }
+        let title_text = Paragraph::new(Line::from(title_spans)).block(title_block);
+        frame.render_widget(title_text, chunks[0]);
+
+        let body_style = if editing.field_focus == 1 {
+            Style::default().bg(Color::DarkGray).fg(Color::White)
+        } else {
+            Style::default().fg(Color::White)
+        };
+        let body_ptr = if editing.field_focus == 1 { "▶ " } else { "  " };
+        let body_block = Block::default()
+            .title(format!("{body_ptr}Body"))
+            .borders(Borders::ALL)
+            .style(body_style);
+        let mut body_spans: Vec<Span> = vec![Span::raw(&editing.body)];
+        if editing.field_focus == 1 {
+            body_spans.push(Span::styled("|", Style::default().fg(Color::Cyan)));
+        }
+        let body_text = Paragraph::new(Line::from(body_spans)).block(body_block);
+        frame.render_widget(body_text, chunks[1]);
+
+        let help = Paragraph::new(Line::from(vec![
+            Span::styled("Tab", Style::default().fg(Color::Cyan)),
+            Span::raw(" switch  "),
+            Span::styled("Ctrl+S", Style::default().fg(Color::Cyan)),
+            Span::raw(" save  "),
+            Span::styled("Esc", Style::default().fg(Color::Cyan)),
+            Span::raw(" cancel"),
+        ]));
+        frame.render_widget(help, chunks[2]);
+
+        frame.render_widget(block, area);
+    }
+
+    fn draw_detail(&self, frame: &mut Frame, area: Rect, issue: &Issue, comments: &[Comment]) {
         let block = Block::default()
             .borders(Borders::ALL)
             .title(format!(" Issue #{} ", issue.number))
@@ -130,6 +309,86 @@ impl IssuesView {
         ];
 
         if let Some(body) = &issue.body {
+            for line in body.lines() {
+                lines.push(Line::from(Span::raw(line)));
+            }
+        }
+
+        if !comments.is_empty() {
+            lines.push(Line::from(Span::raw("")));
+            lines.push(Line::from(Span::styled(
+                format!("─── {} comments ───", comments.len()),
+                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            )));
+            lines.push(Line::from(Span::raw("")));
+
+            for comment in comments {
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        comment.author.as_deref().unwrap_or("unknown"),
+                        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        format!("  {}", comment.created_at.as_deref().unwrap_or("")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                ]));
+                if let Some(body) = &comment.body {
+                    for line in body.lines() {
+                        lines.push(Line::from(Span::raw(format!("  {line}"))));
+                    }
+                }
+                lines.push(Line::from(Span::raw("")));
+            }
+        }
+
+        let detail = Paragraph::new(lines).block(block);
+        frame.render_widget(detail, area);
+    }
+
+    fn draw_note_detail(&self, frame: &mut Frame, area: Rect, note: &Note) {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" Note: {} ", note.title))
+            .style(Style::default().fg(Color::Cyan));
+
+        let mut lines = vec![
+            Line::from(vec![
+                Span::styled("Status: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    &note.status,
+                    Style::default().fg(match note.status.as_str() {
+                        "open" => Color::Green,
+                        _ => Color::Red,
+                    }),
+                ),
+                Span::raw(" | "),
+                Span::styled("Priority: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    &note.priority,
+                    Style::default().fg(match note.priority.as_str() {
+                        "high" => Color::Red,
+                        "medium" => Color::Yellow,
+                        _ => Color::Blue,
+                    }),
+                ),
+            ]),
+            Line::from(vec![
+                Span::styled("Created: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(&note.created_at, Style::default().fg(Color::White)),
+            ]),
+            Line::from(Span::raw("")),
+        ];
+
+        if let Some(num) = note.issue {
+            lines.push(Line::from(vec![
+                Span::styled("Linked to issue: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(format!("#{num}"), Style::default().fg(Color::Magenta)),
+            ]));
+            lines.push(Line::from(Span::raw("")));
+        }
+
+        if let Some(ref body) = note.body {
             for line in body.lines() {
                 lines.push(Line::from(Span::raw(line)));
             }

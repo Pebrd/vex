@@ -20,6 +20,7 @@ struct GhIssue {
     comments: u64,
     created_at: Option<String>,
     updated_at: Option<String>,
+    pull_request: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize)]
@@ -107,6 +108,7 @@ impl Client {
 
         Ok(issues
             .into_iter()
+            .filter(|i| i.pull_request.is_none())
             .map(|i| Issue {
                 number: i.number,
                 title: i.title,
@@ -363,5 +365,99 @@ impl Client {
             .error_for_status()?;
 
         Ok(())
+    }
+
+    pub async fn create_pr(
+        &self,
+        owner: &str,
+        repo: &str,
+        title: &str,
+        body: Option<&str>,
+        head: &str,
+        base: &str,
+    ) -> Result<PullRequest> {
+        #[derive(serde::Serialize)]
+        struct CreatePr {
+            title: String,
+            body: Option<String>,
+            head: String,
+            base: String,
+        }
+
+        let pr: GhPr = self
+            .http
+            .post(format!("https://api.github.com/repos/{owner}/{repo}/pulls"))
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Accept", "application/vnd.github.v3+json")
+            .json(&CreatePr {
+                title: title.to_string(),
+                body: body.map(|s| s.to_string()),
+                head: head.to_string(),
+                base: base.to_string(),
+            })
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+
+        let checks_state = self.get_checks_state(owner, repo, pr.number).await.ok();
+
+        Ok(PullRequest {
+            number: pr.number,
+            title: pr.title,
+            body: pr.body,
+            state: pr.state,
+            author: pr.user.map(|u| u.login),
+            head_branch: pr.head.map(|b| b.r#ref),
+            base_branch: pr.base.map(|b| b.r#ref),
+            mergeable: pr.mergeable.map(|m| if m { "mergeable".to_string() } else { "conflict".to_string() }),
+            checks_state,
+            created_at: pr.created_at,
+            updated_at: pr.updated_at,
+        })
+    }
+
+    pub async fn update_issue(
+        &self,
+        owner: &str,
+        repo: &str,
+        issue_number: u64,
+        title: &str,
+        body: Option<&str>,
+    ) -> Result<Issue> {
+        #[derive(serde::Serialize)]
+        struct UpdateIssue {
+            title: String,
+            body: Option<String>,
+        }
+
+        let issue: GhIssue = self
+            .http
+            .patch(format!("https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}"))
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Accept", "application/vnd.github.v3+json")
+            .json(&UpdateIssue {
+                title: title.to_string(),
+                body: body.map(|s| s.to_string()),
+            })
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+
+        Ok(Issue {
+            number: issue.number,
+            title: issue.title,
+            body: issue.body,
+            state: issue.state,
+            author: issue.user.map(|u| u.login),
+            labels: issue.labels.into_iter().map(|l| l.name).collect(),
+            assignees: issue.assignees.into_iter().map(|a| a.login).collect(),
+            comments: issue.comments,
+            created_at: issue.created_at,
+            updated_at: issue.updated_at,
+        })
     }
 }

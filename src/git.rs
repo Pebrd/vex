@@ -12,6 +12,31 @@ pub fn detect_current_dir() -> Result<Option<RepoInfo>> {
     detect(&cwd)
 }
 
+pub fn current_branch() -> Option<String> {
+    let head_path = Path::new(".git/HEAD");
+    if !head_path.exists() {
+        return None;
+    }
+    let content = std::fs::read_to_string(head_path).ok()?;
+    let content = content.trim();
+    if let Some(ref_str) = content.strip_prefix("ref: refs/heads/") {
+        Some(ref_str.to_string())
+    } else {
+        None
+    }
+}
+
+pub fn project_root() -> Option<PathBuf> {
+    let cwd = std::env::current_dir().ok()?;
+    let git_dir = find_git_dir(&cwd)?;
+    git_dir.parent().map(|p| p.to_path_buf())
+}
+
+pub fn project_root_for(path: &Path) -> Option<PathBuf> {
+    let git_dir = find_git_dir(path)?;
+    git_dir.parent().map(|p| p.to_path_buf())
+}
+
 pub fn detect(path: &Path) -> Result<Option<RepoInfo>> {
     let git_dir = find_git_dir(path);
     let git_dir = match git_dir {

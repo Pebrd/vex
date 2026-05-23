@@ -1,4 +1,4 @@
-use crate::github::PullRequest;
+use crate::github::{Comment, PullRequest};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -20,7 +20,7 @@ impl PRsView {
         }
     }
 
-    pub fn draw(&self, frame: &mut Frame, area: Rect, detail_pr: Option<&PullRequest>) {
+    pub fn draw(&self, frame: &mut Frame, area: Rect, detail_pr: Option<&PullRequest>, comments: Option<&[Comment]>) {
         let layout = if detail_pr.is_some() {
             Layout::default()
                 .direction(Direction::Horizontal)
@@ -91,12 +91,14 @@ impl PRsView {
 
         frame.render_stateful_widget(list, inner, &mut list_state);
 
-        if let Some(pr) = detail_pr {
-            self.draw_detail(frame, layout[1], pr);
+        if let (Some(pr), Some(comments)) = (detail_pr, comments) {
+            self.draw_detail(frame, layout[1], pr, comments);
+        } else if let Some(pr) = detail_pr {
+            self.draw_detail(frame, layout[1], pr, &[]);
         }
     }
 
-    fn draw_detail(&self, frame: &mut Frame, area: Rect, pr: &PullRequest) {
+    fn draw_detail(&self, frame: &mut Frame, area: Rect, pr: &PullRequest, comments: &[Comment]) {
         let block = Block::default()
             .borders(Borders::ALL)
             .title(format!(" PR #{} ", pr.number))
@@ -162,6 +164,34 @@ impl PRsView {
         if let Some(body) = &pr.body {
             for line in body.lines() {
                 lines.push(Line::from(Span::raw(line)));
+            }
+        }
+
+        if !comments.is_empty() {
+            lines.push(Line::from(Span::raw("")));
+            lines.push(Line::from(Span::styled(
+                format!("─── {} comments ───", comments.len()),
+                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            )));
+            lines.push(Line::from(Span::raw("")));
+
+            for comment in comments {
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        comment.author.as_deref().unwrap_or("unknown"),
+                        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        format!("  {}", comment.created_at.as_deref().unwrap_or("")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                ]));
+                if let Some(body) = &comment.body {
+                    for line in body.lines() {
+                        lines.push(Line::from(Span::raw(format!("  {line}"))));
+                    }
+                }
+                lines.push(Line::from(Span::raw("")));
             }
         }
 
