@@ -1,4 +1,35 @@
+# Binaries and build artifacts
 /target/
+**/target/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example  # Allow example env file
+config.toml
+secrets.json
+*.env
+
+# IDE and editor files
+.vscode/
+.idea/
 *.swp
 *.swo
+*~
+
+# OS generated files
 .DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Documentation build artifacts (if any)
+docs/superpowers/
+
+# Misc
+*.bak
+*.tmp

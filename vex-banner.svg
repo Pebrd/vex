@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="100%" height="100%" style="background-color: #000000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <g transform="translate(140, 150)">
+    <path d="M 40,40 L 100,40 L 170,200 L 110,200 Z" fill="#A8B0BC" />
+    <path d="M 260,40 L 200,40 L 150,155 L 180,155 Z" fill="#A8B0BC" />
+    <rect x="190" y="200" width="40" height="40" fill="#FFFFFF" />
+    <line x1="10" y1="260" x2="290" y2="260" stroke="#A8B0BC" stroke-width="4" stroke-linecap="square" />
+  </g>
+
+  <line x1="490" y1="140" x2="490" y2="440" stroke="#1C1E22" stroke-width="1.5" />
+
+  <g transform="translate(540, 180)">
+    <text x="0" y="90" fill="#FFFFFF" font-size="110" font-weight="400" letter-spacing="-1">vex</text>
+    <text x="5" y="155" fill="#A8B0BC" font-size="18" font-weight="500" letter-spacing="7">LIGHTWEIGHT TUI FOR GITHUB</text>
+    
+    <line x1="5" y1="195" x2="480" y2="195" stroke="#1C1E22" stroke-width="1.5" />
+    
+    <text x="5" y="245" fill="#A8B0BC" font-size="15" font-weight="400" letter-spacing="1">Rust · Ratatui · Crossterm · Tokio</text>
+    <text x="5" y="295" fill="#586069" font-size="14" font-weight="400" letter-spacing="1.5">github.com/Pebrd/vex</text>
+  </g>
+
+  <rect x="1130" y="530" width="16" height="16" fill="#1C1E22" />
+</svg>
