@@ -16,7 +16,7 @@ use ratatui::Frame;
 pub fn keybinds_bar(frame: &mut Frame, area: Rect, screen: &str, input_mode: &str) {
     let binds = match (screen, input_mode) {
         ("dashboard", _) => " [a]dd project  [d]elete  [s]tats  [t] roadmap  [enter] open  [q]uit",
-        ("issues", "none") => " [c]reate issue  [e]dit  [Tab] focus  [x] toggle  [o] comment  [n]ote  [L] link note  [p] PRs  [/] search  [s]tats  [t] roadmap  [r] refresh  [q] back  [Q] quit",
+        ("issues", "none") => " [c]reate issue  [e]dit  [Tab] focus  [x] toggle  [o] comment  [n]ote  [L] link note  [f]ilter  [p] PRs  [/] search  [s]tats  [t] roadmap  [r] refresh  [q] back  [Q] quit",
         ("issues", "edit") => " [Tab] switch field  [Ctrl+S] save  [Esc] cancel",
         ("prs", "none") => " [c]reate PR  [m]erge  [o] comment  [i] issues  [/] search  [s]tats  [t] roadmap  [r] refresh  [q] back  [Q] quit",
         ("notes", "none") => " [n]ew note  [enter] open  [d]elete  [q] back  [Q] quit",

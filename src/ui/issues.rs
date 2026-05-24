@@ -2,8 +2,8 @@ use crate::notes::Note;
 use crate::github::{Comment, Issue};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
+use ratatui::text::{Line, Span, Text};
+use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
 use ratatui::Frame;
 
 pub struct IssuesView {
@@ -96,14 +96,18 @@ impl IssuesView {
                     _ => Style::default().fg(Color::Yellow),
                 };
 
+                let state_tag = format!(
+                    " {} ",
+                    if i.state == "open" { "OPEN" } else { "CLOSED" }
+                );
                 let mut spans = vec![
                     Span::styled(
-                        format!(" #{} ", i.number),
-                        Style::default().fg(Color::DarkGray),
+                        state_tag,
+                        state_style.add_modifier(Modifier::REVERSED),
                     ),
                     Span::styled(
-                        if i.state == "open" { " " } else { " " },
-                        state_style,
+                        format!(" #{} ", i.number),
+                        Style::default().fg(Color::Cyan),
                     ),
                     Span::raw(&i.title),
                 ];
@@ -211,6 +215,8 @@ impl IssuesView {
         let is_note = editing.note_slug.is_some();
         let title_text = if is_note {
             " Editing Note ".to_string()
+        } else if editing.issue_number == 0 {
+            " Create Issue ".to_string()
         } else {
             format!(" Editing Issue #{} ", editing.issue_number)
         };
@@ -256,11 +262,17 @@ impl IssuesView {
             .title(format!("{body_ptr}Body"))
             .borders(Borders::ALL)
             .style(body_style);
-        let mut body_spans: Vec<Span> = vec![Span::raw(&editing.body)];
+        let mut body_lines: Vec<Line> = editing.body.lines().map(|l| Line::from(Span::raw(l))).collect();
         if editing.field_focus == 1 {
-            body_spans.push(Span::styled("|", Style::default().fg(Color::Cyan)));
+            if let Some(last) = body_lines.last_mut() {
+                last.push_span(Span::styled("|", Style::default().fg(Color::Cyan)));
+            } else {
+                body_lines.push(Line::from(Span::styled("|", Style::default().fg(Color::Cyan))));
+            }
         }
-        let body_text = Paragraph::new(Line::from(body_spans)).block(body_block);
+        let body_text = Paragraph::new(Text::from(body_lines))
+            .block(body_block)
+            .wrap(Wrap { trim: false });
         frame.render_widget(body_text, chunks[1]);
 
         let help = Paragraph::new(Line::from(vec![
@@ -293,11 +305,20 @@ impl IssuesView {
             ]),
             Line::from(vec![
                 Span::styled(
-                    &issue.state,
+                    "●",
                     Style::default().fg(match issue.state.as_str() {
                         "open" => Color::Green,
                         _ => Color::Red,
                     }),
+                ),
+                Span::styled(
+                    format!(" {} ", issue.state.to_uppercase()),
+                    Style::default()
+                        .fg(match issue.state.as_str() {
+                            "open" => Color::Green,
+                            _ => Color::Red,
+                        })
+                        .add_modifier(Modifier::BOLD),
                 ),
                 Span::raw(" by "),
                 Span::styled(

@@ -16,6 +16,7 @@ use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use fuzzy_matcher::FuzzyMatcher;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::widgets::Clear;
 use ratatui::Frame;
 use ratatui::Terminal;
 use std::collections::HashMap;
@@ -82,6 +83,7 @@ pub struct App {
     selected_note_idx: usize,
     focus: FocusTarget,
     detail_target: DetailTarget,
+    state_filter: String,
 }
 
 impl App {
@@ -142,6 +144,7 @@ impl App {
             selected_note_idx: 0,
             focus: FocusTarget::Issues,
             detail_target: DetailTarget::Issue,
+            state_filter: "open".to_string(),
         };
 
         if app.repo_owner.is_some() && app.repo_name.is_some() {
@@ -164,6 +167,8 @@ impl App {
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(1), Constraint::Length(1), Constraint::Length(1)])
             .split(frame.area());
+
+        frame.render_widget(Clear, layout[0]);
 
         match self.screen {
             Screen::Dashboard => self.dashboard.draw(frame, layout[0]),
@@ -204,6 +209,7 @@ impl App {
                 "none",
             ),
             InputMode::EditIssue { .. } | InputMode::EditNote { .. } => ("issues", "edit"),
+            InputMode::CreateIssue { .. } => ("issues", "edit"),
             _ => ("", ""),
         };
         crate::ui::keybinds_bar(frame, layout[2], screen_str, input_str);
@@ -380,7 +386,11 @@ impl App {
                 match mode {
                     InputMode::EditIssue { title, body, issue_number, .. } => {
                         let body_opt = if body.is_empty() { None } else { Some(body.as_str()) };
-                        self.update_issue(issue_number, &title, body_opt).await?;
+                        if issue_number == 0 {
+                            self.create_issue(&title, body_opt).await?;
+                        } else {
+                            self.update_issue(issue_number, &title, body_opt).await?;
+                        }
                     }
                     InputMode::EditNote { title, body, .. } => {
                         self.create_note_local(&title, if body.is_empty() { None } else { Some(&body) }).await?;
@@ -653,11 +663,13 @@ impl App {
                 };
             }
             KeyCode::Char('c') => {
-                self.input_mode = InputMode::CreateIssue {
+                self.input_mode = InputMode::EditIssue {
                     title: String::new(),
                     body: String::new(),
-                    step: 0,
+                    focus: 0,
+                    issue_number: 0,
                 };
+                self.status = "creating issue (Tab switch, Ctrl+S save)".to_string();
             }
             KeyCode::Char('x') => {
                 match self.focus {
@@ -719,6 +731,15 @@ impl App {
             }
             KeyCode::Char('t') => {
                 self.show_roadmap().await?;
+            }
+            KeyCode::Char('f') => {
+                self.state_filter = match self.state_filter.as_str() {
+                    "open" => "all".to_string(),
+                    "all" => "closed".to_string(),
+                    _ => "open".to_string(),
+                };
+                self.status = format!("filter: {}", self.state_filter);
+                self.refresh_issues().await?;
             }
             KeyCode::Char('r') => {
                 self.refresh_issues().await?;
@@ -989,15 +1010,36 @@ impl App {
     }
 
     async fn update_issue(&mut self, number: u64, title: &str, body: Option<&str>) -> Result<()> {
+        // optimistic local update
+        for issue in self.all_issues.iter_mut() {
+            if issue.number == number {
+                issue.title = title.to_string();
+                issue.body = body.map(|s| s.to_string());
+            }
+        }
+        for issue in self.issues_view.issues.iter_mut() {
+            if issue.number == number {
+                issue.title = title.to_string();
+                issue.body = body.map(|s| s.to_string());
+            }
+        }
+        if let Some(ref mut sel) = self.selected_issue {
+            if sel.number == number {
+                sel.title = title.to_string();
+                sel.body = body.map(|s| s.to_string());
+            }
+        }
+
         if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
             self.status = format!("updating issue #{number}...");
             match self.client.update_issue(owner, repo, number, title, body).await {
-                Ok(updated) => {
-                    self.status = format!("updated issue #{}", updated.number);
+                Ok(_) => {
+                    self.status = format!("updated issue #{number}");
                     self.refresh_issues().await?;
                 }
                 Err(e) => {
-                    self.status = format!("error updating issue: {e}");
+                    self.status = format!("error: {e}");
+                    self.refresh_issues().await?;
                 }
             }
         }
@@ -1005,17 +1047,38 @@ impl App {
     }
 
     async fn toggle_issue_state(&mut self) -> Result<()> {
-        if let Some(issue) = &self.selected_issue {
-            if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
-                let new_state = if issue.state == "open" { "closed" } else { "open" };
-                self.status = format!("{} issue #{}...", new_state, issue.number);
-                match self.client.update_issue_state(owner, repo, issue.number, new_state).await {
-                    Ok(updated) => {
-                        let new_state = updated.state.clone();
-                        self.status = format!("issue #{} {}", updated.number, new_state);
+        let issue_num = self.selected_issue.as_ref().map(|i| i.number);
+        let new_state = if self.selected_issue.as_ref().map_or(false, |i| i.state == "open") { "closed" } else { "open" };
+
+        // optimistic local update
+        if let Some(num) = issue_num {
+            for issue in self.all_issues.iter_mut() {
+                if issue.number == num {
+                    issue.state = new_state.to_string();
+                }
+            }
+            for issue in self.issues_view.issues.iter_mut() {
+                if issue.number == num {
+                    issue.state = new_state.to_string();
+                }
+            }
+            if let Some(ref mut sel) = self.selected_issue {
+                sel.state = new_state.to_string();
+            }
+        }
+
+        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
+            if let Some(num) = issue_num {
+                self.status = format!("{} issue #{num}...", new_state);
+                match self.client.update_issue_state(owner, repo, num, new_state).await {
+                    Ok(_) => {
+                        self.status = format!("issue #{num} {new_state}");
                         self.refresh_issues().await?;
                     }
-                    Err(e) => self.status = format!("error: {e}"),
+                    Err(e) => {
+                        self.status = format!("error: {e}");
+                        self.refresh_issues().await?;
+                    }
                 }
             }
         }
@@ -1363,12 +1426,13 @@ impl App {
     async fn switch_to_issues(&mut self) -> Result<()> {
         if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
             self.loading = true;
-            match self.client.list_issues(owner, repo, Some("open")).await {
+            let filter = if self.state_filter == "all" { None } else { Some(self.state_filter.as_str()) };
+            match self.client.list_issues(owner, repo, filter).await {
                 Ok(issues) => {
                     let count = issues.len();
                     self.all_issues = issues.clone();
                     self.issues_view = IssuesView::new(issues);
-                    self.status = format!("{owner}/{repo} — {count} issues");
+                    self.status = format!("{owner}/{repo} — {count} issues ({})", self.state_filter);
                 }
                 Err(e) => self.status = format!("error: {e}"),
             }
@@ -1404,12 +1468,13 @@ impl App {
     async fn refresh_issues(&mut self) -> Result<()> {
         if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
             self.status = format!("refreshing {owner}/{repo} issues...");
-            match self.client.list_issues(owner, repo, None).await {
+            let filter = if self.state_filter == "all" { None } else { Some(self.state_filter.as_str()) };
+            match self.client.list_issues(owner, repo, filter).await {
                 Ok(issues) => {
                     let count = issues.len();
                     self.all_issues = issues.clone();
                     self.issues_view = IssuesView::new(issues);
-                    self.status = format!("{owner}/{repo} — {count} issues (refreshed)");
+                    self.status = format!("{owner}/{repo} — {count} issues ({})", self.state_filter);
                 }
                 Err(e) => self.status = format!("error: {e}"),
             }
