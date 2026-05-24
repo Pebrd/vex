@@ -425,11 +425,13 @@ impl Client {
         issue_number: u64,
         title: &str,
         body: Option<&str>,
+        labels: &[String],
     ) -> Result<Issue> {
         #[derive(serde::Serialize)]
         struct UpdateIssue {
             title: String,
             body: Option<String>,
+            labels: Vec<String>,
         }
 
         let issue: GhIssue = self
@@ -440,6 +442,7 @@ impl Client {
             .json(&UpdateIssue {
                 title: title.to_string(),
                 body: body.map(|s| s.to_string()),
+                labels: labels.to_vec(),
             })
             .send()
             .await?
@@ -459,5 +462,25 @@ impl Client {
             created_at: issue.created_at,
             updated_at: issue.updated_at,
         })
+    }
+
+    pub async fn list_labels(&self, owner: &str, repo: &str) -> Result<Vec<String>> {
+        #[derive(Deserialize)]
+        struct GhLabel {
+            name: String,
+        }
+
+        let labels: Vec<GhLabel> = self
+            .http
+            .get(format!("https://api.github.com/repos/{owner}/{repo}/labels"))
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Accept", "application/vnd.github.v3+json")
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+
+        Ok(labels.into_iter().map(|l| l.name).collect())
     }
 }

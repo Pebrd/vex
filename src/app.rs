@@ -43,13 +43,12 @@ enum DetailTarget {
 enum InputMode {
     None,
     Search { query: String },
-    CreateIssue { title: String, body: String, step: u8 },
     BrowseProject { browser: FileBrowser },
     Comment { body: String },
     ConfirmMerge { pr_number: u64, selected: u8 },
     CreateNote { title: String, body: String, step: u8 },
     CreatePr { title: String, body: String, step: u8 },
-    EditIssue { title: String, body: String, focus: u8, issue_number: u64 },
+    EditIssue { title: String, body: String, focus: u8, issue_number: u64, labels: Vec<String>, available_labels: Vec<String>, label_idx: usize },
     EditNote { title: String, body: String, focus: u8 },
     LinkNote { input: String },
 }
@@ -209,7 +208,6 @@ impl App {
                 "none",
             ),
             InputMode::EditIssue { .. } | InputMode::EditNote { .. } => ("issues", "edit"),
-            InputMode::CreateIssue { .. } => ("issues", "edit"),
             _ => ("", ""),
         };
         crate::ui::keybinds_bar(frame, layout[2], screen_str, input_str);
@@ -217,13 +215,6 @@ impl App {
         match &self.input_mode {
             InputMode::None => {}
             InputMode::Search { .. } => {}
-            InputMode::CreateIssue { title, body, step } => {
-                let (prompt, value, help) = match step {
-                    0 => ("Issue title", title.as_str(), "enter to confirm, esc to cancel"),
-                    _ => ("Issue body (optional)", body.as_str(), "enter to submit, esc to skip body"),
-                };
-                popup::input_dialog(frame, frame.area(), prompt, value, help);
-            }
             InputMode::BrowseProject { browser } => {
                 browser.draw(frame, frame.area());
             }
@@ -256,13 +247,16 @@ impl App {
 
     fn draw_issues(&self, frame: &mut Frame, area: Rect) {
         let editing = match &self.input_mode {
-            InputMode::EditIssue { title, body, focus, issue_number } => {
+            InputMode::EditIssue { title, body, focus, issue_number, labels, available_labels, label_idx } => {
                 Some(crate::ui::issues::EditState {
                     title: title.clone(),
                     body: body.clone(),
                     field_focus: *focus,
                     issue_number: *issue_number,
                     note_slug: None,
+                    labels: labels.clone(),
+                    available_labels: available_labels.clone(),
+                    label_idx: *label_idx,
                 })
             }
             InputMode::EditNote { title, body, focus } => {
@@ -272,6 +266,9 @@ impl App {
                     field_focus: *focus,
                     issue_number: 0,
                     note_slug: Some(String::new()),
+                    labels: Vec::new(),
+                    available_labels: Vec::new(),
+                    label_idx: 0,
                 })
             }
             _ => None,
@@ -320,7 +317,6 @@ impl App {
                 InputMode::BrowseProject { .. } => self.handle_browse_key(key).await?,
                 InputMode::LinkNote { .. } => self.handle_link_key(key).await?,
                 InputMode::Search { .. }
-                | InputMode::CreateIssue { .. }
                 | InputMode::CreateNote { .. }
                 | InputMode::CreatePr { .. }
                 | InputMode::Comment { .. } => self.handle_input_key(key).await?,
@@ -338,8 +334,10 @@ impl App {
             }
             KeyCode::Tab => {
                 match &mut self.input_mode {
-                    InputMode::EditIssue { focus, .. }
-                    | InputMode::EditNote { focus, .. } => {
+                    InputMode::EditIssue { focus, .. } => {
+                        *focus = (*focus + 1) % 3;
+                    }
+                    InputMode::EditNote { focus, .. } => {
                         *focus = (*focus + 1) % 2;
                     }
                     _ => {}
@@ -381,15 +379,45 @@ impl App {
                     _ => {}
                 }
             }
+            KeyCode::Char('j') | KeyCode::Down => {
+                if let InputMode::EditIssue { focus: 2, label_idx, available_labels, .. } = &mut self.input_mode {
+                    *label_idx = (*label_idx + 1).min(available_labels.len().saturating_sub(1));
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                if let InputMode::EditIssue { focus: 2, label_idx, .. } = &mut self.input_mode {
+                    *label_idx = label_idx.saturating_sub(1);
+                }
+            }
+            KeyCode::Char(' ') => {
+                match &mut self.input_mode {
+                    InputMode::EditIssue { focus: 2, label_idx, labels, available_labels, .. } => {
+                        if let Some(name) = available_labels.get(*label_idx).cloned() {
+                            if let Some(pos) = labels.iter().position(|l| l == &name) {
+                                labels.remove(pos);
+                            } else {
+                                labels.push(name);
+                            }
+                        }
+                    }
+                    InputMode::EditIssue { title, focus: 0, .. } | InputMode::EditNote { title, focus: 0, .. } => {
+                        title.push(' ');
+                    }
+                    InputMode::EditIssue { body, focus: 1, .. } | InputMode::EditNote { body, focus: 1, .. } => {
+                        body.push(' ');
+                    }
+                    _ => {}
+                }
+            }
             KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 let mode = std::mem::replace(&mut self.input_mode, InputMode::None);
                 match mode {
-                    InputMode::EditIssue { title, body, issue_number, .. } => {
+                    InputMode::EditIssue { title, body, issue_number, labels, .. } => {
                         let body_opt = if body.is_empty() { None } else { Some(body.as_str()) };
                         if issue_number == 0 {
-                            self.create_issue(&title, body_opt).await?;
+                            self.create_issue(&title, body_opt, &labels).await?;
                         } else {
-                            self.update_issue(issue_number, &title, body_opt).await?;
+                            self.update_issue(issue_number, &title, body_opt, &labels).await?;
                         }
                     }
                     InputMode::EditNote { title, body, .. } => {
@@ -436,23 +464,6 @@ impl App {
                     InputMode::Search { query } => {
                         self.status = format!("filtered: \"{query}\"");
                     }
-                    InputMode::CreateIssue { title, body, step } => match step {
-                        0 => {
-                            if !title.is_empty() {
-                                self.input_mode = InputMode::CreateIssue {
-                                    title,
-                                    body: String::new(),
-                                    step: 1,
-                                };
-                            } else {
-                                self.status = "title cannot be empty".to_string();
-                                self.input_mode = InputMode::None;
-                            }
-                        }
-                        _ => {
-                            self.create_issue(&title, Some(&body)).await?;
-                        }
-                    },
                     InputMode::Comment { body } => {
                         self.add_comment(&body).await?;
                     }
@@ -513,15 +524,13 @@ impl App {
     fn active_input_mut(&mut self) -> Option<&mut String> {
         match &mut self.input_mode {
             InputMode::Search { query } => Some(query),
-            InputMode::CreateIssue { title, step: 0, .. } => Some(title),
-            InputMode::CreateIssue { body, step: 1, .. } => Some(body),
             InputMode::CreateNote { title, step: 0, .. } => Some(title),
             InputMode::CreateNote { body, step: 1, .. } => Some(body),
             InputMode::Comment { body } => Some(body),
             InputMode::CreatePr { title, step: 0, .. } => Some(title),
             InputMode::CreatePr { body, step: 1, .. } => Some(body),
             InputMode::None | InputMode::ConfirmMerge { .. } | InputMode::BrowseProject { .. } => None,
-            InputMode::CreateIssue { .. } | InputMode::CreateNote { .. } => None,
+            InputMode::CreateNote { .. } => None,
             InputMode::CreatePr { .. } | InputMode::LinkNote { .. } | InputMode::EditIssue { .. } | InputMode::EditNote { .. } => None,
         }
     }
@@ -663,11 +672,22 @@ impl App {
                 };
             }
             KeyCode::Char('c') => {
+                let labels = if self.repo_owner.is_some() && self.repo_name.is_some() {
+                    self.client
+                        .list_labels(self.repo_owner.as_deref().unwrap(), self.repo_name.as_deref().unwrap())
+                        .await
+                        .unwrap_or_default()
+                } else {
+                    Vec::new()
+                };
                 self.input_mode = InputMode::EditIssue {
                     title: String::new(),
                     body: String::new(),
                     focus: 0,
                     issue_number: 0,
+                    labels: Vec::new(),
+                    available_labels: labels,
+                    label_idx: 0,
                 };
                 self.status = "creating issue (Tab switch, Ctrl+S save)".to_string();
             }
@@ -684,11 +704,22 @@ impl App {
             KeyCode::Char('e') => {
                 if self.focus == FocusTarget::Issues {
                     if let Some(ref issue) = self.selected_issue {
+                        let labels = if self.repo_owner.is_some() && self.repo_name.is_some() {
+                            self.client
+                                .list_labels(self.repo_owner.as_deref().unwrap(), self.repo_name.as_deref().unwrap())
+                                .await
+                                .unwrap_or_default()
+                        } else {
+                            Vec::new()
+                        };
                         self.input_mode = InputMode::EditIssue {
                             title: issue.title.clone(),
                             body: issue.body.clone().unwrap_or_default(),
                             focus: 0,
                             issue_number: issue.number,
+                            labels: issue.labels.clone(),
+                            available_labels: labels,
+                            label_idx: 0,
                         };
                         self.status = "editing issue (Tab to switch field, Ctrl+S save)".to_string();
                     }
@@ -989,12 +1020,12 @@ impl App {
 
     // --- Actions ---
 
-    async fn create_issue(&mut self, title: &str, body: Option<&str>) -> Result<()> {
+    async fn create_issue(&mut self, title: &str, body: Option<&str>, labels: &[String]) -> Result<()> {
         if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
             self.status = format!("creating issue...");
             match self
                 .client
-                .create_issue(owner, repo, title, body, &[])
+                .create_issue(owner, repo, title, body, labels)
                 .await
             {
                 Ok(issue) => {
@@ -1009,30 +1040,33 @@ impl App {
         Ok(())
     }
 
-    async fn update_issue(&mut self, number: u64, title: &str, body: Option<&str>) -> Result<()> {
+    async fn update_issue(&mut self, number: u64, title: &str, body: Option<&str>, labels: &[String]) -> Result<()> {
         // optimistic local update
         for issue in self.all_issues.iter_mut() {
             if issue.number == number {
                 issue.title = title.to_string();
                 issue.body = body.map(|s| s.to_string());
+                issue.labels = labels.to_vec();
             }
         }
         for issue in self.issues_view.issues.iter_mut() {
             if issue.number == number {
                 issue.title = title.to_string();
                 issue.body = body.map(|s| s.to_string());
+                issue.labels = labels.to_vec();
             }
         }
         if let Some(ref mut sel) = self.selected_issue {
             if sel.number == number {
                 sel.title = title.to_string();
                 sel.body = body.map(|s| s.to_string());
+                sel.labels = labels.to_vec();
             }
         }
 
         if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
             self.status = format!("updating issue #{number}...");
-            match self.client.update_issue(owner, repo, number, title, body).await {
+            match self.client.update_issue(owner, repo, number, title, body, labels).await {
                 Ok(_) => {
                     self.status = format!("updated issue #{number}");
                     self.refresh_issues().await?;
@@ -1132,9 +1166,26 @@ impl App {
         Ok(())
     }
 
+    fn resolve_project_path(&mut self) {
+        if self.repo_path.as_ref().map_or(true, |p| !p.exists()) {
+            if let (Some(ref owner), Some(ref repo)) = (self.repo_owner.clone(), self.repo_name.clone()) {
+                let found = self.config.projects.iter().find(|p| p.owner == *owner && p.repo == *repo);
+                if let Some(project) = found {
+                    let path = std::path::Path::new(&project.path);
+                    if path.exists() {
+                        self.repo_path = Some(path.to_path_buf());
+                        return;
+                    }
+                }
+            }
+            self.repo_path = None;
+        }
+    }
+
     // --- Note operations ---
 
     async fn create_note_local(&mut self, title: &str, body: Option<&str>) -> Result<()> {
+        self.resolve_project_path();
         let issue = if self.detail_target == DetailTarget::Issue {
             self.selected_issue.as_ref().map(|i| i.number)
         } else {
@@ -1156,6 +1207,7 @@ impl App {
     }
 
     async fn link_selected_note(&mut self, issue_number: u64) -> Result<()> {
+        self.resolve_project_path();
         if let Some(ref path) = self.repo_path {
             if let Some(note) = self.project_notes.get(self.selected_note_idx) {
                 match notes::update_note(
@@ -1179,6 +1231,7 @@ impl App {
     }
 
     async fn delete_selected_note(&mut self) -> Result<()> {
+        self.resolve_project_path();
         if let Some(ref path) = self.repo_path {
             if let Some(note) = self.project_notes.get(self.selected_note_idx) {
                 let slug = note.slug.clone();
@@ -1196,6 +1249,7 @@ impl App {
     }
 
     async fn toggle_note_state(&mut self) -> Result<()> {
+        self.resolve_project_path();
         if let Some(ref path) = self.repo_path {
             if let Some(note) = self.project_notes.get(self.selected_note_idx).cloned() {
                 let new_status = if note.status == "open" { "closed" } else { "open" };
@@ -1220,6 +1274,7 @@ impl App {
     }
 
     async fn toggle_note_standalone_state(&mut self) -> Result<()> {
+        self.resolve_project_path();
         if let Some(ref path) = self.repo_path {
             if let Some(note) = &self.selected_note {
                 let new_status = if note.status == "open" { "closed" } else { "open" };
@@ -1244,6 +1299,7 @@ impl App {
     }
 
     async fn delete_standalone_note(&mut self) -> Result<()> {
+        self.resolve_project_path();
         if let Some(ref path) = self.repo_path {
             if let Some(note) = &self.selected_note {
                 let slug = note.slug.clone();
@@ -1261,6 +1317,7 @@ impl App {
     }
 
     async fn refresh_project_notes(&mut self) -> Result<()> {
+        self.resolve_project_path();
         if let Some(ref path) = self.repo_path {
             match notes::list_notes(path) {
                 Ok(notes) => {
@@ -1279,6 +1336,7 @@ impl App {
     }
 
     async fn refresh_notes(&mut self) -> Result<()> {
+        self.resolve_project_path();
         if let Some(ref path) = self.repo_path {
             match notes::list_notes(path) {
                 Ok(notes) => {

@@ -1,41 +1,63 @@
 use crate::config::Project;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{List, ListItem, ListState, Paragraph};
+use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
 use ratatui::Frame;
 
 pub struct Dashboard {
     pub projects: Vec<Project>,
     pub selected: usize,
-    pub filter: String,
 }
 
 impl Dashboard {
     pub fn new(projects: Vec<Project>) -> Self {
-        Self {
-            projects,
-            selected: 0,
-            filter: String::new(),
-        }
+        Self { projects, selected: 0 }
     }
 
     pub fn draw(&self, frame: &mut Frame, area: Rect) {
-        let layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(3),
-                Constraint::Min(1),
-        ])
-            .split(area);
+        if self.projects.is_empty() {
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .title(" vex — GitHub Issues TUI ")
+                .style(Style::default().fg(Color::Cyan));
+            let inner = block.inner(area);
 
-        let title = Paragraph::new(Line::from(Span::styled(
-            " vex — projects ",
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        )));
-        frame.render_widget(title, layout[0]);
+            let welcome = Paragraph::new(vec![
+                Line::from(Span::raw("")),
+                Line::from(Span::raw("")),
+                Line::from(Span::raw("")),
+                Line::from(Span::styled("  No project selected", Style::default().fg(Color::White).add_modifier(Modifier::BOLD))),
+                Line::from(Span::raw("")),
+                Line::from(Span::raw("  Launch vex from a git repository or add one:")),
+                Line::from(Span::raw("")),
+                Line::from(vec![
+                    Span::raw("    "),
+                    Span::styled("a", Style::default().fg(Color::Cyan)),
+                    Span::raw("  browse for a project directory"),
+                ]),
+                Line::from(vec![
+                    Span::raw("    "),
+                    Span::styled("q", Style::default().fg(Color::Cyan)),
+                    Span::raw("  quit"),
+                ]),
+                Line::from(Span::raw("")),
+                Line::from(Span::styled("  ─────────────────────────────────", Style::default().fg(Color::DarkGray))),
+                Line::from(Span::raw("")),
+                Line::from(Span::styled("  Quick capture:", Style::default().fg(Color::DarkGray))),
+                Line::from(Span::raw("    vex add \"note title\" --body \"...\" --priority high")),
+            ])
+            .wrap(Wrap { trim: false });
+            frame.render_widget(block, area);
+            frame.render_widget(welcome, inner);
+            return;
+        }
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" Projects ({}) ", self.projects.len()))
+            .style(Style::default().fg(Color::Cyan));
+        let inner = block.inner(area);
 
         let items: Vec<ListItem> = self
             .projects
@@ -44,12 +66,13 @@ impl Dashboard {
                 let content = Line::from(vec![
                     Span::styled(
                         &p.name,
-                        Style::default()
-                            .fg(Color::Green)
-                            .add_modifier(Modifier::BOLD),
+                        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
                     ),
                     Span::raw("  "),
-                    Span::styled(&p.path, Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        &p.path,
+                        Style::default().fg(Color::DarkGray),
+                    ),
                     Span::raw("  "),
                     Span::styled(
                         format!("{}/{}", p.owner, p.repo),
@@ -64,15 +87,10 @@ impl Dashboard {
         list_state.select(Some(self.selected));
 
         let list = List::new(items)
-            .highlight_style(
-                Style::default()
-                    .bg(Color::DarkGray)
-                    .add_modifier(Modifier::BOLD),
-            )
+            .highlight_style(Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD))
             .highlight_symbol("> ");
 
-        frame.render_stateful_widget(list, layout[1], &mut list_state);
-
-
+        frame.render_widget(block, area);
+        frame.render_stateful_widget(list, inner, &mut list_state);
     }
 }

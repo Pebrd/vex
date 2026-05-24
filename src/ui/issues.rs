@@ -26,6 +26,9 @@ pub struct EditState {
     pub field_focus: u8,
     pub issue_number: u64,
     pub note_slug: Option<String>,
+    pub labels: Vec<String>,
+    pub available_labels: Vec<String>,
+    pub label_idx: usize,
 }
 
 impl IssuesView {
@@ -216,7 +219,12 @@ impl IssuesView {
         let title_text = if is_note {
             " Editing Note ".to_string()
         } else if editing.issue_number == 0 {
-            " Create Issue ".to_string()
+            let label_count = editing.labels.len();
+            if label_count > 0 {
+                format!(" Creating Issue ({} label{}) ", label_count, if label_count == 1 { "" } else { "s" })
+            } else {
+                " Creating Issue ".to_string()
+            }
         } else {
             format!(" Editing Issue #{} ", editing.issue_number)
         };
@@ -226,13 +234,19 @@ impl IssuesView {
             .style(Style::default().fg(Color::Yellow));
         let inner = block.inner(area);
 
+        let has_label_tags = editing.issue_number == 0 && !editing.labels.is_empty() && editing.field_focus != 2;
+        let mut constraints = vec![
+            Constraint::Length(3),
+            Constraint::Min(1),
+        ];
+        if has_label_tags {
+            constraints.push(Constraint::Length(1));
+        }
+        constraints.push(Constraint::Length(1));
+
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(3),
-                Constraint::Min(1),
-                Constraint::Length(1),
-            ])
+            .constraints(constraints)
             .split(inner);
 
         let title_style = if editing.field_focus == 0 {
@@ -252,38 +266,86 @@ impl IssuesView {
         let title_text = Paragraph::new(Line::from(title_spans)).block(title_block);
         frame.render_widget(title_text, chunks[0]);
 
-        let body_style = if editing.field_focus == 1 {
-            Style::default().bg(Color::DarkGray).fg(Color::White)
+        if editing.field_focus == 2 && editing.issue_number == 0 {
+            let label_style = Style::default().bg(Color::DarkGray).fg(Color::White);
+            let label_ptr = "▶ ";
+            let title = format!("{label_ptr}Labels ({}/{} selected)", editing.labels.len(), editing.available_labels.len());
+            let label_block = Block::default()
+                .title(title)
+                .borders(Borders::ALL)
+                .style(label_style);
+            let label_inner = label_block.inner(chunks[1]);
+            frame.render_widget(label_block, chunks[1]);
+
+            let items: Vec<ListItem> = editing.available_labels.iter().enumerate().map(|(idx, name)| {
+                let checked = if editing.labels.contains(name) { "✓ " } else { "  " };
+                let is_sel = idx == editing.label_idx;
+                let style = if is_sel {
+                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(Color::White)
+                };
+                ListItem::new(Line::from(vec![
+                    Span::styled(checked, Style::default().fg(Color::Green)),
+                    Span::styled(name, style),
+                ]))
+            }).collect();
+
+            let mut list_state = ListState::default();
+            list_state.select(Some(editing.label_idx));
+            let list = List::new(items)
+                .highlight_style(Style::default().bg(Color::DarkGray))
+                .highlight_symbol("> ");
+            frame.render_stateful_widget(list, label_inner, &mut list_state);
         } else {
-            Style::default().fg(Color::White)
-        };
-        let body_ptr = if editing.field_focus == 1 { "▶ " } else { "  " };
-        let body_block = Block::default()
-            .title(format!("{body_ptr}Body"))
-            .borders(Borders::ALL)
-            .style(body_style);
-        let mut body_lines: Vec<Line> = editing.body.lines().map(|l| Line::from(Span::raw(l))).collect();
-        if editing.field_focus == 1 {
-            if let Some(last) = body_lines.last_mut() {
-                last.push_span(Span::styled("|", Style::default().fg(Color::Cyan)));
+            let body_style = if editing.field_focus == 1 {
+                Style::default().bg(Color::DarkGray).fg(Color::White)
             } else {
-                body_lines.push(Line::from(Span::styled("|", Style::default().fg(Color::Cyan))));
+                Style::default().fg(Color::White)
+            };
+            let body_ptr = if editing.field_focus == 1 { "▶ " } else { "  " };
+            let body_block = Block::default()
+                .title(format!("{body_ptr}Body"))
+                .borders(Borders::ALL)
+                .style(body_style);
+            let mut body_lines: Vec<Line> = editing.body.lines().map(|l| Line::from(Span::raw(l))).collect();
+            if editing.field_focus == 1 {
+                if let Some(last) = body_lines.last_mut() {
+                    last.push_span(Span::styled("|", Style::default().fg(Color::Cyan)));
+                } else {
+                    body_lines.push(Line::from(Span::styled("|", Style::default().fg(Color::Cyan))));
+                }
             }
+            let body_text = Paragraph::new(Text::from(body_lines))
+                .block(body_block)
+                .wrap(Wrap { trim: false });
+            frame.render_widget(body_text, chunks[1]);
         }
-        let body_text = Paragraph::new(Text::from(body_lines))
-            .block(body_block)
-            .wrap(Wrap { trim: false });
-        frame.render_widget(body_text, chunks[1]);
+
+        let mut help_idx = 2;
+        if has_label_tags {
+            help_idx = 3;
+            let tags: Vec<Span> = editing.labels.iter().flat_map(|l| {
+                vec![
+                    Span::styled(format!(" {l} "), Style::default().fg(Color::Black).bg(Color::Cyan)),
+                    Span::raw(" "),
+                ]
+            }).collect();
+            let tags_line = Paragraph::new(Line::from(tags)).block(Block::default().borders(Borders::NONE));
+            frame.render_widget(tags_line, chunks[2]);
+        }
 
         let help = Paragraph::new(Line::from(vec![
             Span::styled("Tab", Style::default().fg(Color::Cyan)),
             Span::raw(" switch  "),
+            Span::styled("Space", Style::default().fg(Color::Cyan)),
+            Span::raw(" toggle label  "),
             Span::styled("Ctrl+S", Style::default().fg(Color::Cyan)),
             Span::raw(" save  "),
             Span::styled("Esc", Style::default().fg(Color::Cyan)),
             Span::raw(" cancel"),
         ]));
-        frame.render_widget(help, chunks[2]);
+        frame.render_widget(help, chunks[help_idx]);
 
         frame.render_widget(block, area);
     }
