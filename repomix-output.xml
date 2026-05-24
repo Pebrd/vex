@@ -1,0 +1,4757 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+.vex/
+  .gitignore
+docs/
+  wiki/
+    configuration.md
+    home.md
+    installation.md
+    usage.md
+src/
+  github/
+    client.rs
+    mod.rs
+  ui/
+    dashboard.rs
+    file_browser.rs
+    issues.rs
+    mod.rs
+    notes.rs
+    popup.rs
+    prs.rs
+    roadmap.rs
+    stats.rs
+  app.rs
+  cache.rs
+  config.rs
+  git.rs
+  main.rs
+  notes.rs
+.gitignore
+Cargo.toml
+README.md
+vex-banner.svg
+vex-logo.svg
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path=".vex/.gitignore">
+notes/
+</file>
+
+<file path="docs/wiki/configuration.md">
+# Configuration
+
+vex can be customized through a TOML configuration file. The application looks for this file in the standard configuration directories for your platform:
+
+- Linux: `$XDG_CONFIG_HOME/vex/config.toml` or `$HOME/.config/vex/config.toml`
+- macOS: `$HOME/Library/Application Support/vex/config.toml`
+- Windows: `{FOLDERID_RoamingAppData}\vex\config.toml`
+
+## Configuration Options
+
+### GitHub Settings
+
+```toml
+[github]
+# Your GitHub personal access token (can also be set via GITHUB_TOKEN environment variable)
+token = "your_token_here"
+
+# Default repository to show issues/PRs from (format: "owner/repo")
+default_repo = "owner/repo"
+
+# Number of items to fetch per page (default: 30)
+per_page = 30
+```
+
+### UI Settings
+
+```toml
+[ui]
+# Theme to use: "default", "dark", "light"
+theme = "default"
+
+# Refresh interval in seconds (default: 30)
+refresh_interval = 30
+
+# Enable/disable mouse support
+mouse_enabled = true
+
+# Date format for displaying dates (uses chrono format strings)
+date_format = "%Y-%m-%d %H:%M"
+```
+
+### Keybindings
+
+```toml
+[keybindings]
+# Navigation
+up = "k"
+down = "j"
+left = "h"
+right = "l"
+page_up = "PageUp"
+page_down = "PageDown"
+home = "Home"
+end = "End"
+
+# Actions
+refresh = "r"
+open_in_browser = "o"
+create_issue = "n"
+close_issue = "c"
+reopen_issue = "R"
+assign_to_me = "a"
+add_label = "l"
+```
+
+### Database Settings
+
+```toml
+[database]
+# Path to SQLite database file (default: platform-appropriate data directory)
+# path = "/path/to/vex.db"
+
+# Enable/disable automatic vacuuming
+auto_vacuum = true
+
+# Cache expiration time in hours (default: 24)
+cache_expiration_hours = 24
+```
+
+## Example Configuration
+
+Here's a complete example configuration file:
+
+```toml
+[github]
+token = "ghp_your_actual_token_here"
+default_repo = "owner/awesome-project"
+per_page = 50
+
+[ui]
+theme = "dark"
+refresh_interval = 15
+mouse_enabled = true
+date_format = "%Y-%m-%d %H:%M:%S"
+
+[keybindings]
+up = "k"
+down = "j"
+refresh = "r"
+open_in_browser = "o"
+create_issue = "n"
+
+[database]
+auto_vacuum = true
+cache_expiration_hours = 12
+```
+</file>
+
+<file path="docs/wiki/home.md">
+# vex Wiki
+
+Welcome to the vex documentation wiki. This wiki contains comprehensive guides and references for using and configuring vex, a lightweight TUI for GitHub issues and pull requests.
+
+## Getting Started
+
+- [Installation](installation.md) - How to install and build vex
+- [Usage](usage.md) - Basic and advanced usage instructions
+- [Configuration](configuration.md) - How to customize vex through configuration files
+
+## More Documentation
+
+Additional documentation pages are coming soon. Check back for updates on:
+- Keybindings reference
+- Command references
+- Troubleshooting guide
+- Contributing guidelines
+- Architecture overview
+- API reference
+- Changelog
+- Licensing information
+- FAQ
+
+---
+
+*vex is a lightweight TUI for GitHub issues and pull requests written in Rust.*
+</file>
+
+<file path="docs/wiki/installation.md">
+# Installation
+
+This guide covers how to install and build vex on your system.
+
+## Prerequisites
+
+Before installing vex, make sure you have the following installed:
+
+- **Rust**: Version 1.56 or later
+- **Git**: For cloning the repository
+- **C++ Build Tools**: Required for some dependencies
+
+### Installing Rust
+
+If you don't have Rust installed, you can install it using rustup:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+After installation, source your environment:
+
+```bash
+source $HOME/.cargo/env
+```
+
+Verify the installation:
+
+```bash
+rustc --version
+# Should show version 1.56 or later
+```
+
+## Building from Source
+
+### Step 1: Clone the Repository
+
+```bash
+git clone https://github.com/Pebrd/vex.git
+cd vex
+```
+
+### Step 2: Install Dependencies
+
+On Ubuntu/Debian:
+```bash
+sudo apt-get install build-essential libssl-dev pkg-config
+```
+
+On Fedora:
+```bash
+sudo dnf install gcc openssl-devel pkg-config
+```
+
+On macOS (using Homebrew):
+```bash
+brew install openssl pkg-config
+```
+
+On Windows, make sure you have Visual Studio Build Tools installed.
+
+### Step 3: Build the Project
+
+To build a debug version:
+```bash
+cargo build
+```
+
+To build an optimized release version:
+```bash
+cargo build --release
+```
+
+The binary will be located at:
+- Debug: `target/debug/vex`
+- Release: `target/release/vex`
+
+### Step 4: Install (Optional)
+
+To install vex system-wide:
+```bash
+cargo install --path .
+```
+
+This will place the binary in your Cargo bin directory (usually `$HOME/.cargo/bin`).
+
+## Running vex
+
+After building, run vex with your GitHub token:
+
+```bash
+# Using command line argument
+./target/release/vex --token YOUR_GITHUB_TOKEN
+
+# Using environment variable
+export GITHUB_TOKEN=YOUR_GITHUB_TOKEN
+./target/release/vex
+```
+
+## Verifying Installation
+
+To verify that vex is installed correctly, run:
+```bash
+vex --help
+```
+
+This should display the help message with available options.
+
+## Updating vex
+
+To update to the latest version:
+```bash
+git pull
+cargo build --release
+```
+
+## Troubleshooting Installation
+
+### Common Issues
+
+**Missing OpenSSL headers**: Install libssl-dev (Ubuntu/Debian) or openssl-devel (Fedora)
+
+**Linker errors**: Ensure you have build tools installed (build-essential, Xcode command line tools, etc.)
+
+**Permission denied**: Make sure you have write permissions to the target directory
+
+**Outdated Rust version**: Update rustc using `rustup update`
+
+### Getting Help
+
+If you encounter issues during installation:
+1. Check the [Troubleshooting](troubleshooting.md) guide
+2. Look for similar issues in the GitHub repository
+3. File a new issue with details about your system and the error message
+</file>
+
+<file path="docs/wiki/usage.md">
+# Usage
+
+This guide covers how to use vex for interacting with GitHub issues and pull requests.
+
+## Getting Started
+
+To run vex, you need to provide your GitHub personal access token. You can do this in two ways:
+
+1. As a command-line argument:
+   ```bash
+   vex --token YOUR_GITHUB_TOKEN
+   ```
+
+2. As an environment variable:
+   ```bash
+   export GITHUB_TOKEN=YOUR_GITHUB_TOKEN
+   vex
+   ```
+
+## Main Interface
+
+When you start vex, you'll see the main interface divided into several sections:
+
+- **Top Bar**: Shows the current repository, refresh status, and help
+- **Main Panel**: Displays the list of issues or pull requests
+- **Bottom Bar**: Shows available actions and keybindings
+- **Right Panel** (when expanded): Shows detailed information about the selected item
+
+## Navigation
+
+Use these keys to navigate through the interface:
+
+- `k` / `Up Arrow`: Move up
+- `j` / `Down Arrow`: Move down
+- `h` / `Left Arrow`: Move left (in split views)
+- `l` / `Right Arrow`: Move right (in split views)
+- `PageUp` / `PageDown`: Page up/down
+- `Home` / `End`: Go to beginning/end of list
+- `g`: Go to first item
+- `G`: Go to last item
+
+## Filtering and Sorting
+
+vex supports filtering and sorting of issues and pull requests:
+
+- `/`: Activate filter input
+- `Esc`: Clear filter
+- `s`: Open sort menu
+- `f`: Open filter menu
+
+In the filter menu, you can filter by:
+- Author
+- Labels
+- Milestone
+- State (open/closed)
+- Assignee
+
+In the sort menu, you can sort by:
+- Created date
+- Updated date
+- Comments
+- Reactions
+
+## Actions
+
+Perform actions on selected issues or pull requests:
+
+- `o`: Open in browser
+- `r`: Refresh data
+- `n`: Create new issue
+- `c`: Close issue/PR
+- `R`: Reopen issue/PR
+- `a`: Assign to yourself
+- `l`: Add/remove labels
+- `m`: Set milestone
+- `d`: Add/delete comment
+- `v`: Toggle vote/reaction
+
+## Viewing Details
+
+When you select an issue or pull request, press `Enter` or `Tab` to expand the right panel and view detailed information including:
+
+- Full description
+- Comments
+- Labels
+- Milestone
+- Assignees
+- Reaction counts
+
+## Keyboard Shortcuts Reference
+
+For a complete list of keyboard shortcuts, see the [Keybindings](keybindings.md) page.
+
+## Tips and Tricks
+
+- Use fuzzy matching in filters to quickly find items
+- Press `?` at any time to show the help overlay
+- The application automatically caches data for offline viewing
+- Customize refresh intervals in the configuration file
+- Use environment variables for sensitive data like tokens
+</file>
+
+<file path="src/github/mod.rs">
+pub mod client;
+
+pub use client::Client;
+
+#[derive(Debug, Clone)]
+pub struct Issue {
+    pub number: u64,
+    pub title: String,
+    pub body: Option<String>,
+    pub state: String,
+    pub author: Option<String>,
+    pub labels: Vec<String>,
+    pub assignees: Vec<String>,
+    pub comments: u64,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PullRequest {
+    pub number: u64,
+    pub title: String,
+    pub body: Option<String>,
+    pub state: String,
+    pub author: Option<String>,
+    pub head_branch: Option<String>,
+    pub base_branch: Option<String>,
+    pub mergeable: Option<String>,
+    pub checks_state: Option<String>,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Comment {
+    pub id: u64,
+    pub author: Option<String>,
+    pub body: Option<String>,
+    pub created_at: Option<String>,
+}
+</file>
+
+<file path="src/ui/file_browser.rs">
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
+use ratatui::Frame;
+use std::path::{Path, PathBuf};
+
+#[derive(Debug, Clone)]
+pub struct DirEntry {
+    pub name: String,
+    pub path: PathBuf,
+    pub is_dir: bool,
+    pub is_git_repo: bool,
+}
+
+pub struct FileBrowser {
+    pub current_dir: PathBuf,
+    pub entries: Vec<DirEntry>,
+    pub selected: usize,
+    pub show_hidden: bool,
+}
+
+impl FileBrowser {
+    pub fn new(path: &Path) -> Self {
+        let path = if path.exists() && path.is_dir() {
+            path.to_path_buf()
+        } else {
+            dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"))
+        };
+
+        let mut fb = Self {
+            current_dir: path,
+            entries: Vec::new(),
+            selected: 0,
+            show_hidden: false,
+        };
+        fb.refresh();
+        fb
+    }
+
+    pub fn navigate(&mut self, dir: &Path) {
+        if dir.exists() && dir.is_dir() {
+            self.current_dir = dir.to_path_buf();
+            self.selected = 0;
+            self.refresh();
+        }
+    }
+
+    pub fn go_up(&mut self) {
+        if let Some(parent) = self.current_dir.parent() {
+            let prev = self.current_dir.clone();
+            self.current_dir = parent.to_path_buf();
+            self.selected = 0;
+            self.refresh();
+            // Try to select the directory we just left
+            if let Some(pos) = self.entries.iter().position(|e| e.path == prev) {
+                self.selected = pos;
+            }
+        }
+    }
+
+    pub fn refresh(&mut self) {
+        self.entries.clear();
+        let mut dirs = Vec::new();
+        let mut files = Vec::new();
+
+        if let Ok(read) = std::fs::read_dir(&self.current_dir) {
+            for entry in read.flatten() {
+                let path = entry.path();
+                let name = entry.file_name().to_string_lossy().to_string();
+
+                if !self.show_hidden && name.starts_with('.') {
+                    continue;
+                }
+
+                let is_dir = path.is_dir();
+                let is_git_repo = is_dir && path.join(".git").exists();
+
+                let de = DirEntry {
+                    name,
+                    path,
+                    is_dir,
+                    is_git_repo,
+                };
+
+                if is_dir {
+                    dirs.push(de);
+                } else {
+                    files.push(de);
+                }
+            }
+        }
+
+        dirs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        files.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+
+        self.entries.extend(dirs);
+        self.entries.extend(files);
+
+        if !self.entries.is_empty() {
+            self.selected = self.selected.min(self.entries.len() - 1);
+        }
+    }
+
+    pub fn selected_path(&self) -> Option<PathBuf> {
+        self.entries.get(self.selected).map(|e| e.path.clone())
+    }
+
+    pub fn selected_is_dir(&self) -> bool {
+        self.entries.get(self.selected).map(|e| e.is_dir).unwrap_or(false)
+    }
+
+    pub fn draw(&self, frame: &mut Frame, area: Rect) {
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Min(1),
+                Constraint::Length(1),
+            ])
+            .split(area);
+
+        let path_str = self.current_dir.to_string_lossy();
+        let path_display = Paragraph::new(Line::from(Span::styled(
+            &*path_str,
+            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        )));
+        frame.render_widget(path_display, layout[0]);
+
+        let items: Vec<ListItem> = self
+            .entries
+            .iter()
+            .map(|e| {
+                let icon = if e.is_git_repo {
+                    "  "
+                } else if e.is_dir {
+                    "  "
+                } else {
+                    "  "
+                };
+                let name_style = if e.is_dir {
+                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(Color::White)
+                };
+                let git_indicator = if e.is_git_repo {
+                    Span::styled(" ", Style::default().fg(Color::Green))
+                } else {
+                    Span::raw("")
+                };
+                ListItem::new(Line::from(vec![
+                    Span::styled(icon, Style::default().fg(Color::DarkGray)),
+                    Span::styled(&e.name, name_style),
+                    git_indicator,
+                ]))
+            })
+            .collect();
+
+        let mut list_state = ListState::default();
+        list_state.select(Some(self.selected));
+
+        let list = List::new(items)
+            .highlight_style(
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol("> ")
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Select a git project ")
+                    .style(Style::default().fg(Color::Cyan)),
+            );
+
+        frame.render_stateful_widget(list, layout[1], &mut list_state);
+
+        let hint = Paragraph::new(Line::from(Span::styled(
+            " j/k navigate  enter enter dir / select  esc go up  h toggle hidden  q cancel ",
+            Style::default().fg(Color::DarkGray),
+        )));
+        frame.render_widget(hint, layout[2]);
+    }
+}
+</file>
+
+<file path="src/ui/notes.rs">
+use crate::notes::Note;
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
+use ratatui::Frame;
+
+pub struct NotesView {
+    pub notes: Vec<Note>,
+    pub selected: usize,
+}
+
+impl NotesView {
+    pub fn new(notes: Vec<Note>) -> Self {
+        Self { notes, selected: 0 }
+    }
+
+    pub fn draw(&self, frame: &mut Frame, area: Rect, detail: Option<&Note>) {
+        let layout = if detail.is_some() {
+            Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Ratio(2, 5), Constraint::Ratio(3, 5)])
+                .split(area)
+        } else {
+            Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Min(1), Constraint::Length(0)])
+                .split(area)
+        };
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(" Local Notes ")
+            .style(Style::default().fg(Color::Cyan));
+        let inner = block.inner(layout[0]);
+        frame.render_widget(block, layout[0]);
+
+        let items: Vec<ListItem> = self
+            .notes
+            .iter()
+            .map(|n| {
+                let priority_style = match n.priority.as_str() {
+                    "high" => Style::default().fg(Color::Red),
+                    "medium" => Style::default().fg(Color::Yellow),
+                    _ => Style::default().fg(Color::Blue),
+                };
+                let status_icon = if n.status == "open" { " " } else { " " };
+
+                let mut spans = vec![
+                    Span::styled(status_icon, priority_style),
+                    Span::styled(&n.title, Style::default().fg(Color::White)),
+                    Span::raw(" "),
+                    Span::styled(
+                        match n.priority.as_str() {
+                            "high" => " ↑",
+                            "medium" => " –",
+                            _ => " ↓",
+                        },
+                        priority_style,
+                    ),
+                ];
+
+                if let Some(num) = n.issue {
+                    spans.push(Span::raw(" "));
+                    spans.push(Span::styled(
+                        format!("#{num}"),
+                        Style::default().fg(Color::Magenta),
+                    ));
+                }
+
+                ListItem::new(Line::from(spans))
+            })
+            .collect();
+
+        let mut list_state = ListState::default();
+        list_state.select(Some(self.selected));
+
+        let list = List::new(items)
+            .highlight_style(
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol("> ");
+
+        frame.render_stateful_widget(list, inner, &mut list_state);
+
+        if let Some(note) = detail {
+            self.draw_detail(frame, layout[1], note);
+        }
+    }
+
+    fn draw_detail(&self, frame: &mut Frame, area: Rect, note: &Note) {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" Note: {} ", note.title))
+            .style(Style::default().fg(Color::Cyan));
+
+        let mut lines = vec![
+            Line::from(vec![
+                Span::styled(
+                    &note.title,
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ]),
+            Line::from(vec![
+                Span::styled(
+                    &note.status,
+                    Style::default().fg(match note.status.as_str() {
+                        "open" => Color::Green,
+                        _ => Color::Red,
+                    }),
+                ),
+                Span::raw(" | priority: "),
+                Span::styled(
+                    &note.priority,
+                    Style::default().fg(match note.priority.as_str() {
+                        "high" => Color::Red,
+                        "medium" => Color::Yellow,
+                        _ => Color::Blue,
+                    }),
+                ),
+                Span::raw(" | "),
+                Span::styled(&note.created_at, Style::default().fg(Color::DarkGray)),
+            ]),
+            Line::from(Span::raw("")),
+        ];
+
+        if let Some(num) = note.issue {
+            lines.push(Line::from(vec![
+                Span::styled("Linked to issue: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(format!("#{num}"), Style::default().fg(Color::Magenta)),
+            ]));
+            lines.push(Line::from(Span::raw("")));
+        }
+
+        if let Some(body) = &note.body {
+            for line in body.lines() {
+                lines.push(Line::from(Span::raw(line)));
+            }
+        }
+
+        let detail = Paragraph::new(lines).block(block);
+        frame.render_widget(detail, area);
+    }
+}
+</file>
+
+<file path="src/ui/popup.rs">
+use ratatui::layout::Rect;
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use ratatui::Frame;
+
+pub fn input_dialog(frame: &mut Frame, area: Rect, title: &str, value: &str, help: &str) {
+    let popup = crate::ui::centered_rect(60, 20, area);
+    frame.render_widget(Clear, popup);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!(" {title} "))
+        .style(Style::default().fg(Color::Cyan));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    let input = Paragraph::new(Span::raw(value))
+        .style(Style::default().fg(Color::White))
+        .block(Block::default().borders(Borders::ALL));
+    frame.render_widget(input, inner);
+
+    let hint = Paragraph::new(Line::from(Span::styled(
+        help,
+        Style::default().fg(Color::DarkGray),
+    )));
+    let hint_area = Rect::new(inner.x, inner.bottom(), inner.width, 1);
+    frame.render_widget(hint, hint_area);
+
+    let cursor_x = inner.x + 1 + value.len() as u16;
+    let cursor_y = inner.y + 1;
+    let _ = frame.set_cursor_position((cursor_x.min(inner.right().saturating_sub(1)), cursor_y));
+}
+
+pub fn confirm_dialog(frame: &mut Frame, area: Rect, title: &str, message: &str) {
+    let popup = crate::ui::centered_rect(50, 20, area);
+    frame.render_widget(Clear, popup);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!(" {title} "))
+        .style(Style::default().fg(Color::Cyan));
+
+    let inner = block.inner(popup);
+    let msg = Paragraph::new(Line::from(Span::styled(
+        message,
+        Style::default().fg(Color::White),
+    )));
+
+    let hint = Paragraph::new(Line::from(Span::styled(
+        "[y]es  [n]o  [esc] cancel",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let layout = ratatui::layout::Layout::default()
+        .direction(ratatui::layout::Direction::Vertical)
+        .constraints([
+            ratatui::layout::Constraint::Min(1),
+            ratatui::layout::Constraint::Length(1),
+        ])
+        .split(inner);
+
+    frame.render_widget(block, popup);
+    frame.render_widget(msg, layout[0]);
+    frame.render_widget(hint, layout[1]);
+}
+
+pub fn merge_dialog(frame: &mut Frame, area: Rect, selected: usize) {
+    let popup = crate::ui::centered_rect(50, 30, area);
+    frame.render_widget(Clear, popup);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Merge PR ")
+        .style(Style::default().fg(Color::Cyan));
+
+    let inner = block.inner(popup);
+    let methods = [
+        ("1", "merge commit"),
+        ("2", "squash"),
+        ("3", "rebase"),
+    ];
+
+    let items: Vec<Line> = methods
+        .iter()
+        .enumerate()
+        .map(|(i, (key, label))| {
+            let style = if i == selected {
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            Line::from(Span::styled(format!(" [{key}] {label}"), style))
+        })
+        .collect();
+
+    let mut lines = items;
+    lines.push(Line::from(Span::raw("")));
+    lines.push(Line::from(Span::styled(
+        " esc to cancel ",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(block, popup);
+    frame.render_widget(paragraph, inner);
+}
+</file>
+
+<file path="src/ui/roadmap.rs">
+use crate::github::Issue;
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph};
+use ratatui::Frame;
+use std::collections::BTreeMap;
+
+pub struct RoadmapView {
+    pub owner: String,
+    pub repo: String,
+    pub groups: Vec<(String, Vec<Issue>)>,
+    pub selected_group: usize,
+    pub selected_item: usize,
+}
+
+impl RoadmapView {
+    pub fn new(owner: &str, repo: &str) -> Self {
+        Self {
+            owner: owner.to_string(),
+            repo: repo.to_string(),
+            groups: Vec::new(),
+            selected_group: 0,
+            selected_item: 0,
+        }
+    }
+
+    pub fn update(&mut self, issues: &[Issue]) {
+        let mut map: BTreeMap<String, Vec<Issue>> = BTreeMap::new();
+        for issue in issues {
+            if issue.state != "open" {
+                continue;
+            }
+            if issue.labels.is_empty() {
+                map.entry("no label".to_string()).or_default().push(issue.clone());
+            } else {
+                for label in &issue.labels {
+                    map.entry(label.clone()).or_default().push(issue.clone());
+                }
+            }
+        }
+        self.groups = map.into_iter().collect();
+    }
+
+    pub fn draw(&self, frame: &mut Frame, area: Rect) {
+        let title = Paragraph::new(Line::from(vec![
+            Span::styled(
+                format!(" {}/{} — Roadmap ", self.owner, self.repo),
+                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            ),
+        ]));
+        frame.render_widget(title, area);
+
+        if self.groups.is_empty() {
+            let empty = Paragraph::new("no open issues with labels")
+                .style(Style::default().fg(Color::DarkGray));
+            frame.render_widget(empty, area);
+            return;
+        }
+
+        let constraints: Vec<Constraint> = self
+            .groups
+            .iter()
+            .map(|_| Constraint::Ratio(1, self.groups.len() as u32))
+            .collect();
+
+        let columns = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(constraints)
+            .split(area);
+
+        for (idx, (label, issues)) in self.groups.iter().enumerate() {
+            let is_selected = idx == self.selected_group;
+            let border_color = if is_selected { Color::Green } else { Color::DarkGray };
+            let title_text = format!(" {label} ({})", issues.len());
+
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .title(title_text)
+                .border_style(Style::default().fg(border_color));
+
+            let items: Vec<ListItem> = issues.iter().map(|issue| {
+                ListItem::new(Line::from(Span::styled(
+                    format!("#{} {}", issue.number, issue.title),
+                    Style::default().fg(Color::White),
+                )))
+            }).collect();
+
+            let list = List::new(items)
+                .block(block)
+                .highlight_style(Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD));
+
+            let mut state = ratatui::widgets::ListState::default();
+            if is_selected {
+                state.select(Some(self.selected_item.min(issues.len().saturating_sub(1))));
+            }
+            frame.render_stateful_widget(list, columns[idx], &mut state);
+        }
+    }
+}
+</file>
+
+<file path="src/ui/stats.rs">
+use crate::github::{Issue, PullRequest};
+use ratatui::layout::Rect;
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph};
+use ratatui::Frame;
+
+pub struct StatsView {
+    pub owner: String,
+    pub repo: String,
+    pub total_items: Vec<String>,
+    pub selected: usize,
+}
+
+impl StatsView {
+    pub fn new(owner: &str, repo: &str) -> Self {
+        Self {
+            owner: owner.to_string(),
+            repo: repo.to_string(),
+            total_items: Vec::new(),
+            selected: 0,
+        }
+    }
+
+    pub fn update(&mut self, issues: &[Issue], prs: &[PullRequest]) {
+        let open_issues = issues.iter().filter(|i| i.state == "open").count();
+        let closed_issues = issues.iter().filter(|i| i.state == "closed").count();
+        let open_prs = prs.iter().filter(|p| p.state == "open").count();
+        let closed_prs = prs.iter().filter(|p| p.state == "closed").count();
+        let merged_prs = prs.iter().filter(|p| p.state == "merged" || p.state == "closed").count() - closed_prs;
+
+        self.total_items = vec![
+            format!("Issues (open): {open_issues}"),
+            format!("Issues (closed): {closed_issues}"),
+            format!("Issues (total): {}", issues.len()),
+            String::new(),
+            format!("PRs (open): {open_prs}"),
+            format!("PRs (closed): {closed_prs}"),
+            format!("PRs (merged): {merged_prs}"),
+            format!("PRs (total): {}", prs.len()),
+        ];
+    }
+
+    pub fn draw(&self, frame: &mut Frame, area: Rect) {
+        let title = Paragraph::new(Line::from(vec![
+            Span::styled(
+                format!(" {}/{} — Statistics ", self.owner, self.repo),
+                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            ),
+        ]));
+        frame.render_widget(title, area);
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .style(Style::default().fg(Color::Cyan));
+        let inner = block.inner(area);
+
+        let items: Vec<ListItem> = self
+            .total_items
+            .iter()
+            .map(|s| {
+                if s.is_empty() {
+                    ListItem::new(Line::from(""))
+                } else {
+                    let color = if s.contains("open") {
+                        Color::Green
+                    } else if s.contains("closed") || s.contains("merged") {
+                        Color::Yellow
+                    } else {
+                        Color::White
+                    };
+                    ListItem::new(Line::from(Span::styled(s, Style::default().fg(color))))
+                }
+            })
+            .collect();
+
+        let list = List::new(items)
+            .block(block)
+            .highlight_style(Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD))
+            .highlight_symbol("> ");
+
+        let mut state = ratatui::widgets::ListState::default();
+        state.select(Some(self.selected));
+        frame.render_stateful_widget(list, inner, &mut state);
+    }
+}
+</file>
+
+<file path="src/config.rs">
+use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Config {
+    pub token: String,
+    pub projects: Vec<Project>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Project {
+    pub name: String,
+    pub path: String,
+    pub owner: String,
+    pub repo: String,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            token: String::new(),
+            projects: Vec::new(),
+        }
+    }
+}
+
+fn config_path() -> Result<PathBuf> {
+    let dir = dirs::config_dir()
+        .context("config directory not found")?
+        .join("vex");
+    Ok(dir)
+}
+
+pub fn config_file() -> Result<PathBuf> {
+    Ok(config_path()?.join("config.toml"))
+}
+
+pub fn data_dir() -> Result<PathBuf> {
+    let dir = dirs::data_dir()
+        .context("data directory not found")?
+        .join("vex");
+    Ok(dir)
+}
+
+pub fn resolve_token(config: &Config) -> String {
+    if !config.token.is_empty() {
+        return config.token.clone();
+    }
+    if let Ok(output) = std::process::Command::new("sh")
+        .args(["-c", "gh auth token 2>/dev/null"])
+        .output()
+    {
+        if output.status.success() {
+            return String::from_utf8_lossy(&output.stdout).trim().to_string();
+        }
+    }
+    String::new()
+}
+
+pub fn load() -> Result<Config> {
+    let path = config_file()?;
+    if !path.exists() {
+        return Ok(Config::default());
+    }
+    let content = std::fs::read_to_string(&path)
+        .with_context(|| format!("reading config from {}", path.display()))?;
+    let config: Config =
+        toml::from_str(&content).with_context(|| format!("parsing config {}", path.display()))?;
+    Ok(config)
+}
+
+pub fn save(config: &Config) -> Result<()> {
+    let path = config_file()?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let content = toml::to_string_pretty(config)?;
+    std::fs::write(&path, content)?;
+    Ok(())
+}
+</file>
+
+<file path="src/notes.rs">
+use anyhow::Result;
+use chrono::Local;
+use std::path::{Path, PathBuf};
+
+#[derive(Debug, Clone)]
+pub struct Note {
+    pub slug: String,
+    pub title: String,
+    pub body: Option<String>,
+    pub priority: String,
+    pub status: String,
+    pub created_at: String,
+    pub issue: Option<u64>,
+}
+
+fn notes_dir(project_dir: &Path) -> PathBuf {
+    project_dir.join(".vex").join("notes")
+}
+
+fn parse_front_matter(content: &str) -> Option<(Vec<(String, String)>, String)> {
+    let content = content.trim();
+    if !content.starts_with("---") {
+        return None;
+    }
+    let after_first = &content[3..];
+    let end = after_first.find("\n---")?;
+    let front = after_first[..end].trim();
+    let body = after_first[end + 4..].trim().to_string();
+
+    let mut fields = Vec::new();
+    for line in front.lines() {
+        let line = line.trim();
+        if let Some(eq) = line.find(':') {
+            let key = line[..eq].trim().to_string();
+            let value = line[eq + 1..].trim().to_string();
+            fields.push((key, value));
+        }
+    }
+    Some((fields, body))
+}
+
+fn get_field(fields: &[(String, String)], key: &str) -> Option<String> {
+    fields
+        .iter()
+        .find(|(k, _)| k == key)
+        .map(|(_, v)| v.clone())
+}
+
+fn serialize_note(note: &Note) -> String {
+    let mut s = String::from("---\n");
+    s.push_str(&format!("title: {}\n", note.title));
+    s.push_str(&format!("status: {}\n", note.status));
+    s.push_str(&format!("priority: {}\n", note.priority));
+    s.push_str(&format!("created_at: {}\n", note.created_at));
+    if let Some(issue) = note.issue {
+        s.push_str(&format!("issue: {issue}\n"));
+    }
+    s.push_str("---\n");
+    if let Some(ref body) = note.body {
+        s.push_str(body);
+        s.push('\n');
+    }
+    s
+}
+
+fn slugify(title: &str) -> String {
+    title
+        .to_lowercase()
+        .chars()
+        .filter_map(|c| {
+            if c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' {
+                Some(c)
+            } else {
+                None
+            }
+        })
+        .collect::<String>()
+        .replace(' ', "-")
+        .trim_matches('-')
+        .to_string()
+}
+
+fn priority_order(p: &str) -> u8 {
+    match p {
+        "high" => 0,
+        "medium" => 1,
+        _ => 2,
+    }
+}
+
+fn read_note_file(path: &Path) -> Option<Note> {
+    let content = std::fs::read_to_string(path).ok()?;
+    let slug = path.file_stem()?.to_string_lossy().to_string();
+    let (fields, body) = parse_front_matter(&content)?;
+
+    let body = if body.is_empty() { None } else { Some(body) };
+    let issue = get_field(&fields, "issue").and_then(|v| v.parse::<u64>().ok());
+
+    Some(Note {
+        slug,
+        title: get_field(&fields, "title").unwrap_or_default(),
+        body,
+        priority: get_field(&fields, "priority").unwrap_or_else(|| "medium".to_string()),
+        status: get_field(&fields, "status").unwrap_or_else(|| "open".to_string()),
+        created_at: get_field(&fields, "created_at").unwrap_or_else(|| Local::now().format("%Y-%m-%d").to_string()),
+        issue,
+    })
+}
+
+fn ensure_notes_dir(project_dir: &Path) -> Result<PathBuf> {
+    let dir = notes_dir(project_dir);
+    std::fs::create_dir_all(&dir)?;
+    let gitignore_path = project_dir.join(".vex").join(".gitignore");
+    if !gitignore_path.exists() {
+        std::fs::write(&gitignore_path, "notes/\n")?;
+    }
+    Ok(dir)
+}
+
+pub fn list_notes(project_dir: &Path) -> Result<Vec<Note>> {
+    let dir = notes_dir(project_dir);
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+    let mut notes: Vec<Note> = std::fs::read_dir(&dir)?
+        .filter_map(|entry| entry.ok())
+        .filter(|e| e.path().extension().map(|ext| ext == "md").unwrap_or(false))
+        .filter_map(|e| read_note_file(&e.path()))
+        .collect();
+
+    notes.sort_by(|a, b| {
+        priority_order(&a.priority)
+            .cmp(&priority_order(&b.priority))
+            .then_with(|| b.created_at.cmp(&a.created_at))
+    });
+    Ok(notes)
+}
+
+pub fn create_note(
+    project_dir: &Path,
+    title: &str,
+    body: Option<&str>,
+    priority: &str,
+    issue: Option<u64>,
+) -> Result<Note> {
+    let dir = ensure_notes_dir(project_dir)?;
+    let now = Local::now().format("%Y-%m-%d").to_string();
+    let base = slugify(title);
+    let slug = if base.is_empty() { format!("note-{now}") } else { base };
+
+    let mut final_slug = slug.clone();
+    let mut counter = 1;
+    while dir.join(format!("{final_slug}.md")).exists() {
+        final_slug = format!("{slug}-{counter}");
+        counter += 1;
+    }
+
+    let note = Note {
+        slug: final_slug.clone(),
+        title: title.to_string(),
+        body: body.map(|b| b.to_string()),
+        priority: priority.to_string(),
+        status: "open".to_string(),
+        created_at: now,
+        issue,
+    };
+
+    std::fs::write(dir.join(format!("{final_slug}.md")), serialize_note(&note))?;
+    Ok(note)
+}
+
+pub fn update_note(
+    project_dir: &Path,
+    slug: &str,
+    title: &str,
+    body: Option<&str>,
+    priority: &str,
+    status: &str,
+    issue: Option<u64>,
+) -> Result<()> {
+    let dir = ensure_notes_dir(project_dir)?;
+    let path = dir.join(format!("{slug}.md"));
+
+    let existing = read_note_file(&path).ok_or_else(|| anyhow::anyhow!("note not found: {slug}"))?;
+
+    let note = Note {
+        slug: slug.to_string(),
+        title: title.to_string(),
+        body: body.map(|b| b.to_string()),
+        priority: priority.to_string(),
+        status: status.to_string(),
+        created_at: existing.created_at.clone(),
+        issue,
+    };
+
+    std::fs::write(path, serialize_note(&note))?;
+    Ok(())
+}
+
+pub fn delete_note(project_dir: &Path, slug: &str) -> Result<()> {
+    let path = notes_dir(project_dir).join(format!("{slug}.md"));
+    if path.exists() {
+        std::fs::remove_file(path)?;
+    }
+    Ok(())
+}
+
+pub fn get_note(project_dir: &Path, slug: &str) -> Result<Option<Note>> {
+    let path = notes_dir(project_dir).join(format!("{slug}.md"));
+    if path.exists() {
+        Ok(read_note_file(&path))
+    } else {
+        Ok(None)
+    }
+}
+</file>
+
+<file path="Cargo.toml">
+[package]
+name = "vex"
+version = "0.1.0"
+edition = "2024"
+authors = ["Pebrd"]
+description = "Lightweight TUI for GitHub issues and pull requests"
+license = "MIT"
+
+[[bin]]
+name = "vex"
+path = "src/main.rs"
+
+[dependencies]
+ratatui = "0.30.0"
+crossterm = "0.29.0"
+tokio = { version = "1.52.3", features = ["full"] }
+reqwest = { version = "0.13.3", features = ["json", "rustls"], default-features = false }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+toml = "1.1.2"
+rusqlite = { version = "0.39.0", features = ["bundled"] }
+chrono = { version = "0.4.44", features = ["serde"] }
+dirs = "6.0.0"
+anyhow = "1.0.102"
+fuzzy-matcher = "0.3.7"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+</file>
+
+<file path="README.md">
+# vex
+
+<div align="center">
+  <img src="vex-banner.svg" alt="vex banner">
+</div>
+
+Lightweight TUI for GitHub issues and pull requests
+
+## Description
+
+vex is a terminal user interface (TUI) application designed to interact with GitHub issues and pull requests efficiently. Built with Rust, it leverages the ratatui and crossterm libraries for a responsive and interactive terminal experience.
+
+## Features
+
+- Browse and filter GitHub issues and pull requests
+- View detailed information about issues and PRs
+- Interact with GitHub directly from your terminal
+- Lightweight and fast performance
+
+## Installation
+
+### Prerequisites
+
+- Rust toolchain (version 1.56 or later)
+- GitHub account and personal access token (for API access)
+
+### Build from Source
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/vex.git
+   cd vex
+   ```
+
+2. Build the project:
+   ```bash
+   cargo build --release
+   ```
+
+3. The binary will be available at `target/release/vex`
+
+## Usage
+
+Run the application with your GitHub personal access token:
+
+```bash
+vex --token YOUR_GITHUB_TOKEN
+```
+
+Or set the token as an environment variable:
+
+```bash
+export GITHUB_TOKEN=YOUR_GITHUB_TOKEN
+vex
+```
+
+## Configuration
+
+vex can be configured via a TOML file located at `$HOME/.config/vex/config.toml` (or platform equivalent). See the [configuration wiki](docs/wiki/configuration.md) for details.
+
+## Dependencies
+
+- [ratatui](https://github.com/ratatui/ratatui) - Terminal user interface library
+- [crossterm](https://github.com/crossterm-rs/crossterm) - Cross-platform terminal manipulation
+- [tokio](https://tokio.rs) - Asynchronous runtime
+- [reqwest](https://github.com/seanmonstar/reqwest) - HTTP client
+- [serde](https://serde.rs) - Serialization framework
+- [rusqlite](https://github.com/rusqlite/rusqlite) - SQLite bindings
+- [chrono](https://github.com/chronotope/chrono) - Date and time handling
+- [dirs](https://github.com/rust-lang-nursery/dirs) - Directory resolution
+- [anyhow](https://github.com/dtolnay/anyhow) - Error handling
+- [fuzzy-matcher](https://github.com/rapiz1/fuzzy-matcher) - Fuzzy string matching
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## Contact
+
+Pebrd - [https://github.com/Pebrd](https://github.com/Pebrd)
+
+Project Link: [https://github.com/Pebrd/vex](https://github.com/Pebrd/vex)
+</file>
+
+<file path="vex-banner.svg">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="100%" height="100%" style="background-color: #000000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <g transform="translate(140, 150)">
+    <path d="M 40,40 L 100,40 L 170,200 L 110,200 Z" fill="#A8B0BC" />
+    <path d="M 260,40 L 200,40 L 150,155 L 180,155 Z" fill="#A8B0BC" />
+    <rect x="190" y="200" width="40" height="40" fill="#FFFFFF" />
+    <line x1="10" y1="260" x2="290" y2="260" stroke="#A8B0BC" stroke-width="4" stroke-linecap="square" />
+  </g>
+
+  <line x1="490" y1="140" x2="490" y2="440" stroke="#1C1E22" stroke-width="1.5" />
+
+  <g transform="translate(540, 180)">
+    <text x="0" y="90" fill="#FFFFFF" font-size="110" font-weight="400" letter-spacing="-1">vex</text>
+    <text x="5" y="155" fill="#A8B0BC" font-size="18" font-weight="500" letter-spacing="7">LIGHTWEIGHT TUI FOR GITHUB</text>
+    
+    <line x1="5" y1="195" x2="480" y2="195" stroke="#1C1E22" stroke-width="1.5" />
+    
+    <text x="5" y="245" fill="#A8B0BC" font-size="15" font-weight="400" letter-spacing="1">Rust · Ratatui · Crossterm · Tokio</text>
+    <text x="5" y="295" fill="#586069" font-size="14" font-weight="400" letter-spacing="1.5">github.com/Pebrd/vex</text>
+  </g>
+
+  <rect x="1130" y="530" width="16" height="16" fill="#1C1E22" />
+</svg>
+</file>
+
+<file path="vex-logo.svg">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%" style="background-color: #000000;">
+  <g transform="translate(100, 100)">
+    <path d="M 40,40 L 100,40 L 170,200 L 110,200 Z" fill="#A8B0BC" />
+    
+    <path d="M 260,40 L 200,40 L 150,155 L 180,155 Z" fill="#A8B0BC" />
+    
+    <rect x="190" y="200" width="40" height="40" fill="#FFFFFF" />
+    
+    <line x1="10" y1="260" x2="290" y2="260" stroke="#A8B0BC" stroke-width="4" stroke-linecap="square" />
+  </g>
+</svg>
+</file>
+
+<file path="src/github/client.rs">
+use super::{Comment, Issue, PullRequest};
+use anyhow::{Context, Result};
+use crate::config::{self, Config};
+use serde::Deserialize;
+
+pub struct Client {
+    token: String,
+    http: reqwest::Client,
+}
+
+#[derive(Deserialize)]
+struct GhIssue {
+    number: u64,
+    title: String,
+    body: Option<String>,
+    state: String,
+    user: Option<GhUser>,
+    labels: Vec<GhLabel>,
+    assignees: Vec<GhUser>,
+    comments: u64,
+    created_at: Option<String>,
+    updated_at: Option<String>,
+    pull_request: Option<serde_json::Value>,
+}
+
+#[derive(Deserialize)]
+struct GhPr {
+    number: u64,
+    title: String,
+    body: Option<String>,
+    state: String,
+    user: Option<GhUser>,
+    head: Option<GhBranch>,
+    base: Option<GhBranch>,
+    mergeable: Option<bool>,
+    created_at: Option<String>,
+    updated_at: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct GhComment {
+    id: u64,
+    user: Option<GhUser>,
+    body: Option<String>,
+    created_at: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct GhUser {
+    login: String,
+}
+
+#[derive(Deserialize)]
+struct GhLabel {
+    name: String,
+}
+
+#[derive(Deserialize)]
+struct GhBranch {
+    label: String,
+    r#ref: String,
+}
+
+#[derive(Deserialize)]
+struct GhCombinedStatus {
+    state: String,
+}
+
+impl Client {
+    pub fn new(config: &Config) -> Self {
+        let http = reqwest::Client::builder()
+            .user_agent("vex/0.1.0")
+            .build()
+            .expect("building reqwest client");
+        let token = config::resolve_token(config);
+        Self {
+            token,
+            http,
+        }
+    }
+
+    fn github_get(&self, path: &str) -> reqwest::RequestBuilder {
+        self.http
+            .get(format!("https://api.github.com{path}"))
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Accept", "application/vnd.github.v3+json")
+    }
+
+    pub async fn list_issues(
+        &self,
+        owner: &str,
+        repo: &str,
+        state: Option<&str>,
+    ) -> Result<Vec<Issue>> {
+        let path = match state {
+            Some(s) => format!("/repos/{owner}/{repo}/issues?state={s}"),
+            None => format!("/repos/{owner}/{repo}/issues"),
+        };
+        let issues: Vec<GhIssue> = self
+            .github_get(&path)
+            .send()
+            .await
+            .with_context(|| format!("fetching issues for {owner}/{repo}"))?
+            .error_for_status()
+            .with_context(|| format!("GitHub API error for {owner}/{repo} issues"))?
+            .json()
+            .await?;
+
+        Ok(issues
+            .into_iter()
+            .filter(|i| i.pull_request.is_none())
+            .map(|i| Issue {
+                number: i.number,
+                title: i.title,
+                body: i.body,
+                state: i.state,
+                author: i.user.map(|u| u.login),
+                labels: i.labels.into_iter().map(|l| l.name).collect(),
+                assignees: i.assignees.into_iter().map(|a| a.login).collect(),
+                comments: i.comments,
+                created_at: i.created_at,
+                updated_at: i.updated_at,
+            })
+            .collect())
+    }
+
+    pub async fn list_pull_requests(
+        &self,
+        owner: &str,
+        repo: &str,
+        state: Option<&str>,
+    ) -> Result<Vec<PullRequest>> {
+        let path = match state {
+            Some(s) => format!("/repos/{owner}/{repo}/pulls?state={s}"),
+            None => format!("/repos/{owner}/{repo}/pulls"),
+        };
+        let prs: Vec<GhPr> = self
+            .github_get(&path)
+            .send()
+            .await
+            .with_context(|| format!("fetching PRs for {owner}/{repo}"))?
+            .error_for_status()?
+            .json()
+            .await?;
+
+        let mut result = Vec::new();
+        for pr in prs {
+            let checks_state = self.get_checks_state(owner, repo, pr.number).await.ok();
+
+            result.push(PullRequest {
+                number: pr.number,
+                title: pr.title,
+                body: pr.body,
+                state: pr.state,
+                author: pr.user.map(|u| u.login),
+                head_branch: pr.head.map(|b| b.r#ref),
+                base_branch: pr.base.map(|b| b.r#ref),
+                mergeable: pr.mergeable.map(|m| if m { "mergeable".to_string() } else { "conflict".to_string() }),
+                checks_state,
+                created_at: pr.created_at,
+                updated_at: pr.updated_at,
+            });
+        }
+
+        Ok(result)
+    }
+
+    async fn get_checks_state(
+        &self,
+        owner: &str,
+        repo: &str,
+        pr_number: u64,
+    ) -> Result<String> {
+        let status: GhCombinedStatus = self
+            .github_get(&format!(
+                "/repos/{owner}/{repo}/commits/{pr_number}/status"
+            ))
+            .send()
+            .await
+            .with_context(|| format!("fetching checks for PR #{pr_number}"))?
+            .error_for_status()?
+            .json()
+            .await?;
+        Ok(status.state)
+    }
+
+    pub async fn list_comments(
+        &self,
+        owner: &str,
+        repo: &str,
+        issue_number: u64,
+    ) -> Result<Vec<Comment>> {
+        let comments: Vec<GhComment> = self
+            .github_get(&format!(
+                "/repos/{owner}/{repo}/issues/{issue_number}/comments"
+            ))
+            .send()
+            .await
+            .with_context(|| format!("fetching comments for #{issue_number}"))?
+            .error_for_status()?
+            .json()
+            .await?;
+
+        Ok(comments
+            .into_iter()
+            .map(|c| Comment {
+                id: c.id,
+                author: c.user.map(|u| u.login),
+                body: c.body,
+                created_at: c.created_at,
+            })
+            .collect())
+    }
+
+    pub async fn create_issue(
+        &self,
+        owner: &str,
+        repo: &str,
+        title: &str,
+        body: Option<&str>,
+        labels: &[String],
+    ) -> Result<Issue> {
+        #[derive(serde::Serialize)]
+        struct CreateIssue {
+            title: String,
+            body: Option<String>,
+            labels: Vec<String>,
+        }
+
+        let payload = CreateIssue {
+            title: title.to_string(),
+            body: body.map(|s| s.to_string()),
+            labels: labels.to_vec(),
+        };
+
+        let issue: GhIssue = self
+            .http
+            .post(format!(
+                "https://api.github.com/repos/{owner}/{repo}/issues"
+            ))
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Accept", "application/vnd.github.v3+json")
+            .json(&payload)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+
+        Ok(Issue {
+            number: issue.number,
+            title: issue.title,
+            body: issue.body,
+            state: issue.state,
+            author: issue.user.map(|u| u.login),
+            labels: issue.labels.into_iter().map(|l| l.name).collect(),
+            assignees: issue.assignees.into_iter().map(|a| a.login).collect(),
+            comments: issue.comments,
+            created_at: issue.created_at,
+            updated_at: issue.updated_at,
+        })
+    }
+
+    pub async fn create_comment(
+        &self,
+        owner: &str,
+        repo: &str,
+        issue_number: u64,
+        body: &str,
+    ) -> Result<Comment> {
+        #[derive(serde::Serialize)]
+        struct CreateComment {
+            body: String,
+        }
+
+        let comment: GhComment = self
+            .http
+            .post(format!(
+                "https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}/comments"
+            ))
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Accept", "application/vnd.github.v3+json")
+            .json(&CreateComment {
+                body: body.to_string(),
+            })
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+
+        Ok(Comment {
+            id: comment.id,
+            author: comment.user.map(|u| u.login),
+            body: comment.body,
+            created_at: comment.created_at,
+        })
+    }
+
+    pub async fn update_issue_state(
+        &self,
+        owner: &str,
+        repo: &str,
+        issue_number: u64,
+        state: &str,
+    ) -> Result<Issue> {
+        #[derive(serde::Serialize)]
+        struct UpdateState {
+            state: String,
+        }
+
+        let issue: GhIssue = self
+            .http
+            .patch(format!(
+                "https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}"
+            ))
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Accept", "application/vnd.github.v3+json")
+            .json(&UpdateState {
+                state: state.to_string(),
+            })
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+
+        Ok(Issue {
+            number: issue.number,
+            title: issue.title,
+            body: issue.body,
+            state: issue.state,
+            author: issue.user.map(|u| u.login),
+            labels: issue.labels.into_iter().map(|l| l.name).collect(),
+            assignees: issue.assignees.into_iter().map(|a| a.login).collect(),
+            comments: issue.comments,
+            created_at: issue.created_at,
+            updated_at: issue.updated_at,
+        })
+    }
+
+    pub async fn merge_pr(
+        &self,
+        owner: &str,
+        repo: &str,
+        pr_number: u64,
+        method: &str,
+    ) -> Result<()> {
+        #[derive(serde::Serialize)]
+        struct MergePr {
+            merge_method: String,
+        }
+
+        self.http
+            .put(format!(
+                "https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/merge"
+            ))
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Accept", "application/vnd.github.v3+json")
+            .json(&MergePr {
+                merge_method: method.to_string(),
+            })
+            .send()
+            .await?
+            .error_for_status()?;
+
+        Ok(())
+    }
+
+    pub async fn create_pr(
+        &self,
+        owner: &str,
+        repo: &str,
+        title: &str,
+        body: Option<&str>,
+        head: &str,
+        base: &str,
+    ) -> Result<PullRequest> {
+        #[derive(serde::Serialize)]
+        struct CreatePr {
+            title: String,
+            body: Option<String>,
+            head: String,
+            base: String,
+        }
+
+        let pr: GhPr = self
+            .http
+            .post(format!("https://api.github.com/repos/{owner}/{repo}/pulls"))
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Accept", "application/vnd.github.v3+json")
+            .json(&CreatePr {
+                title: title.to_string(),
+                body: body.map(|s| s.to_string()),
+                head: head.to_string(),
+                base: base.to_string(),
+            })
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+
+        let checks_state = self.get_checks_state(owner, repo, pr.number).await.ok();
+
+        Ok(PullRequest {
+            number: pr.number,
+            title: pr.title,
+            body: pr.body,
+            state: pr.state,
+            author: pr.user.map(|u| u.login),
+            head_branch: pr.head.map(|b| b.r#ref),
+            base_branch: pr.base.map(|b| b.r#ref),
+            mergeable: pr.mergeable.map(|m| if m { "mergeable".to_string() } else { "conflict".to_string() }),
+            checks_state,
+            created_at: pr.created_at,
+            updated_at: pr.updated_at,
+        })
+    }
+
+    pub async fn update_issue(
+        &self,
+        owner: &str,
+        repo: &str,
+        issue_number: u64,
+        title: &str,
+        body: Option<&str>,
+    ) -> Result<Issue> {
+        #[derive(serde::Serialize)]
+        struct UpdateIssue {
+            title: String,
+            body: Option<String>,
+        }
+
+        let issue: GhIssue = self
+            .http
+            .patch(format!("https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}"))
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Accept", "application/vnd.github.v3+json")
+            .json(&UpdateIssue {
+                title: title.to_string(),
+                body: body.map(|s| s.to_string()),
+            })
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+
+        Ok(Issue {
+            number: issue.number,
+            title: issue.title,
+            body: issue.body,
+            state: issue.state,
+            author: issue.user.map(|u| u.login),
+            labels: issue.labels.into_iter().map(|l| l.name).collect(),
+            assignees: issue.assignees.into_iter().map(|a| a.login).collect(),
+            comments: issue.comments,
+            created_at: issue.created_at,
+            updated_at: issue.updated_at,
+        })
+    }
+}
+</file>
+
+<file path="src/ui/dashboard.rs">
+use crate::config::Project;
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{List, ListItem, ListState, Paragraph};
+use ratatui::Frame;
+
+pub struct Dashboard {
+    pub projects: Vec<Project>,
+    pub selected: usize,
+    pub filter: String,
+}
+
+impl Dashboard {
+    pub fn new(projects: Vec<Project>) -> Self {
+        Self {
+            projects,
+            selected: 0,
+            filter: String::new(),
+        }
+    }
+
+    pub fn draw(&self, frame: &mut Frame, area: Rect) {
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3),
+                Constraint::Min(1),
+        ])
+            .split(area);
+
+        let title = Paragraph::new(Line::from(Span::styled(
+            " vex — projects ",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )));
+        frame.render_widget(title, layout[0]);
+
+        let items: Vec<ListItem> = self
+            .projects
+            .iter()
+            .map(|p| {
+                let content = Line::from(vec![
+                    Span::styled(
+                        &p.name,
+                        Style::default()
+                            .fg(Color::Green)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::raw("  "),
+                    Span::styled(&p.path, Style::default().fg(Color::DarkGray)),
+                    Span::raw("  "),
+                    Span::styled(
+                        format!("{}/{}", p.owner, p.repo),
+                        Style::default().fg(Color::Cyan),
+                    ),
+                ]);
+                ListItem::new(content)
+            })
+            .collect();
+
+        let mut list_state = ListState::default();
+        list_state.select(Some(self.selected));
+
+        let list = List::new(items)
+            .highlight_style(
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol("> ");
+
+        frame.render_stateful_widget(list, layout[1], &mut list_state);
+
+
+    }
+}
+</file>
+
+<file path="src/ui/issues.rs">
+use crate::notes::Note;
+use crate::github::{Comment, Issue};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span, Text};
+use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
+use ratatui::Frame;
+
+pub struct IssuesView {
+    pub issues: Vec<Issue>,
+    pub selected: usize,
+    pub filter_state: Option<String>,
+    pub filter_label: Option<String>,
+}
+
+#[derive(PartialEq, Clone, Copy)]
+pub enum FocusTarget {
+    Issues,
+    Notes,
+}
+
+#[derive(Clone)]
+pub struct EditState {
+    pub title: String,
+    pub body: String,
+    pub field_focus: u8,
+    pub issue_number: u64,
+    pub note_slug: Option<String>,
+}
+
+impl IssuesView {
+    pub fn new(issues: Vec<Issue>) -> Self {
+        Self {
+            issues,
+            selected: 0,
+            filter_state: None,
+            filter_label: None,
+        }
+    }
+
+    pub fn draw(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        detail_issue: Option<&Issue>,
+        comments: Option<&[Comment]>,
+        notes: &[Note],
+        note_selected: usize,
+        focus: FocusTarget,
+        editing: Option<&EditState>,
+    ) {
+        let layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Ratio(2, 5), Constraint::Ratio(3, 5)])
+            .split(area);
+
+        let left_panels = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+            .split(layout[0]);
+
+        self.draw_issues_list(frame, left_panels[0], focus == FocusTarget::Issues);
+        self.draw_notes_list(frame, left_panels[1], notes, note_selected, focus == FocusTarget::Notes);
+
+        if let Some(editing) = editing {
+            self.draw_detail_editing(frame, layout[1], editing);
+        } else if let Some(issue) = detail_issue {
+            self.draw_detail(frame, layout[1], issue, comments.unwrap_or(&[]));
+        } else if focus == FocusTarget::Notes {
+            if let Some(note) = notes.get(note_selected) {
+                self.draw_note_detail(frame, layout[1], note);
+            }
+        }
+    }
+
+    fn draw_issues_list(&self, frame: &mut Frame, area: Rect, is_active: bool) {
+        let border_style = if is_active {
+            Style::default().fg(Color::Cyan)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(" Issues ")
+            .style(border_style);
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        let items: Vec<ListItem> = self
+            .issues
+            .iter()
+            .map(|i| {
+                let state_style = match i.state.as_str() {
+                    "open" => Style::default().fg(Color::Green),
+                    "closed" => Style::default().fg(Color::Red),
+                    _ => Style::default().fg(Color::Yellow),
+                };
+
+                let state_tag = format!(
+                    " {} ",
+                    if i.state == "open" { "OPEN" } else { "CLOSED" }
+                );
+                let mut spans = vec![
+                    Span::styled(
+                        state_tag,
+                        state_style.add_modifier(Modifier::REVERSED),
+                    ),
+                    Span::styled(
+                        format!(" #{} ", i.number),
+                        Style::default().fg(Color::Cyan),
+                    ),
+                    Span::raw(&i.title),
+                ];
+
+                if !i.labels.is_empty() {
+                    spans.push(Span::raw(" "));
+                    for label in &i.labels {
+                        spans.push(Span::styled(
+                            format!("[{}]", label),
+                            Style::default().fg(Color::Magenta),
+                        ));
+                    }
+                }
+
+                ListItem::new(Line::from(spans))
+            })
+            .collect();
+
+        let mut list_state = ListState::default();
+        list_state.select(Some(self.selected));
+
+        let highlight = if is_active {
+            Style::default()
+                .bg(Color::DarkGray)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+
+        let list = List::new(items)
+            .highlight_style(highlight)
+            .highlight_symbol(if is_active { "> " } else { "  " });
+
+        frame.render_stateful_widget(list, inner, &mut list_state);
+    }
+
+    fn draw_notes_list(&self, frame: &mut Frame, area: Rect, notes: &[Note], selected: usize, is_active: bool) {
+        let border_style = if is_active {
+            Style::default().fg(Color::Cyan)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(" Notes ")
+            .style(border_style);
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        let items: Vec<ListItem> = notes
+            .iter()
+            .map(|n| {
+                let priority_style = match n.priority.as_str() {
+                    "high" => Style::default().fg(Color::Red),
+                    "medium" => Style::default().fg(Color::Yellow),
+                    _ => Style::default().fg(Color::Blue),
+                };
+                let status_icon = if n.status == "open" { " " } else { " " };
+
+                let mut spans = vec![
+                    Span::styled(status_icon, priority_style),
+                    Span::raw(&n.title),
+                    Span::raw(" "),
+                    Span::styled(
+                        match n.priority.as_str() {
+                            "high" => "↑",
+                            "medium" => "–",
+                            _ => "↓",
+                        },
+                        priority_style,
+                    ),
+                ];
+
+                if let Some(num) = n.issue {
+                    spans.push(Span::raw(" "));
+                    spans.push(Span::styled(
+                        format!("#{num}"),
+                        Style::default().fg(Color::Magenta),
+                    ));
+                }
+
+                ListItem::new(Line::from(spans))
+            })
+            .collect();
+
+        let mut list_state = ListState::default();
+        list_state.select(Some(selected));
+
+        let highlight = if is_active {
+            Style::default()
+                .bg(Color::DarkGray)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+
+        let list = List::new(items)
+            .highlight_style(highlight)
+            .highlight_symbol(if is_active { "> " } else { "  " });
+
+        frame.render_stateful_widget(list, inner, &mut list_state);
+    }
+
+    fn draw_detail_editing(&self, frame: &mut Frame, area: Rect, editing: &EditState) {
+        let is_note = editing.note_slug.is_some();
+        let title_text = if is_note {
+            " Editing Note ".to_string()
+        } else {
+            format!(" Editing Issue #{} ", editing.issue_number)
+        };
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(title_text)
+            .style(Style::default().fg(Color::Yellow));
+        let inner = block.inner(area);
+
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3),
+                Constraint::Min(1),
+                Constraint::Length(1),
+            ])
+            .split(inner);
+
+        let title_style = if editing.field_focus == 0 {
+            Style::default().bg(Color::DarkGray).fg(Color::White)
+        } else {
+            Style::default().fg(Color::White)
+        };
+        let title_ptr = if editing.field_focus == 0 { "▶ " } else { "  " };
+        let title_block = Block::default()
+            .title(format!("{title_ptr}Title"))
+            .borders(Borders::ALL)
+            .style(title_style);
+        let mut title_spans: Vec<Span> = vec![Span::raw(&editing.title)];
+        if editing.field_focus == 0 {
+            title_spans.push(Span::styled("|", Style::default().fg(Color::Cyan)));
+        }
+        let title_text = Paragraph::new(Line::from(title_spans)).block(title_block);
+        frame.render_widget(title_text, chunks[0]);
+
+        let body_style = if editing.field_focus == 1 {
+            Style::default().bg(Color::DarkGray).fg(Color::White)
+        } else {
+            Style::default().fg(Color::White)
+        };
+        let body_ptr = if editing.field_focus == 1 { "▶ " } else { "  " };
+        let body_block = Block::default()
+            .title(format!("{body_ptr}Body"))
+            .borders(Borders::ALL)
+            .style(body_style);
+        let mut body_lines: Vec<Line> = editing.body.lines().map(|l| Line::from(Span::raw(l))).collect();
+        if editing.field_focus == 1 {
+            if let Some(last) = body_lines.last_mut() {
+                last.push_span(Span::styled("|", Style::default().fg(Color::Cyan)));
+            } else {
+                body_lines.push(Line::from(Span::styled("|", Style::default().fg(Color::Cyan))));
+            }
+        }
+        let body_text = Paragraph::new(Text::from(body_lines))
+            .block(body_block)
+            .wrap(Wrap { trim: false });
+        frame.render_widget(body_text, chunks[1]);
+
+        let help = Paragraph::new(Line::from(vec![
+            Span::styled("Tab", Style::default().fg(Color::Cyan)),
+            Span::raw(" switch  "),
+            Span::styled("Ctrl+S", Style::default().fg(Color::Cyan)),
+            Span::raw(" save  "),
+            Span::styled("Esc", Style::default().fg(Color::Cyan)),
+            Span::raw(" cancel"),
+        ]));
+        frame.render_widget(help, chunks[2]);
+
+        frame.render_widget(block, area);
+    }
+
+    fn draw_detail(&self, frame: &mut Frame, area: Rect, issue: &Issue, comments: &[Comment]) {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" Issue #{} ", issue.number))
+            .style(Style::default().fg(Color::Cyan));
+
+        let mut lines = vec![
+            Line::from(vec![
+                Span::styled(
+                    &issue.title,
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ]),
+            Line::from(vec![
+                Span::styled(
+                    "●",
+                    Style::default().fg(match issue.state.as_str() {
+                        "open" => Color::Green,
+                        _ => Color::Red,
+                    }),
+                ),
+                Span::styled(
+                    format!(" {} ", issue.state.to_uppercase()),
+                    Style::default()
+                        .fg(match issue.state.as_str() {
+                            "open" => Color::Green,
+                            _ => Color::Red,
+                        })
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(" by "),
+                Span::styled(
+                    issue.author.as_deref().unwrap_or("unknown"),
+                    Style::default().fg(Color::Cyan),
+                ),
+            ]),
+            Line::from(Span::raw("")),
+        ];
+
+        if let Some(body) = &issue.body {
+            for line in body.lines() {
+                lines.push(Line::from(Span::raw(line)));
+            }
+        }
+
+        if !comments.is_empty() {
+            lines.push(Line::from(Span::raw("")));
+            lines.push(Line::from(Span::styled(
+                format!("─── {} comments ───", comments.len()),
+                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            )));
+            lines.push(Line::from(Span::raw("")));
+
+            for comment in comments {
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        comment.author.as_deref().unwrap_or("unknown"),
+                        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        format!("  {}", comment.created_at.as_deref().unwrap_or("")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                ]));
+                if let Some(body) = &comment.body {
+                    for line in body.lines() {
+                        lines.push(Line::from(Span::raw(format!("  {line}"))));
+                    }
+                }
+                lines.push(Line::from(Span::raw("")));
+            }
+        }
+
+        let detail = Paragraph::new(lines).block(block);
+        frame.render_widget(detail, area);
+    }
+
+    fn draw_note_detail(&self, frame: &mut Frame, area: Rect, note: &Note) {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" Note: {} ", note.title))
+            .style(Style::default().fg(Color::Cyan));
+
+        let mut lines = vec![
+            Line::from(vec![
+                Span::styled("Status: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    &note.status,
+                    Style::default().fg(match note.status.as_str() {
+                        "open" => Color::Green,
+                        _ => Color::Red,
+                    }),
+                ),
+                Span::raw(" | "),
+                Span::styled("Priority: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    &note.priority,
+                    Style::default().fg(match note.priority.as_str() {
+                        "high" => Color::Red,
+                        "medium" => Color::Yellow,
+                        _ => Color::Blue,
+                    }),
+                ),
+            ]),
+            Line::from(vec![
+                Span::styled("Created: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(&note.created_at, Style::default().fg(Color::White)),
+            ]),
+            Line::from(Span::raw("")),
+        ];
+
+        if let Some(num) = note.issue {
+            lines.push(Line::from(vec![
+                Span::styled("Linked to issue: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(format!("#{num}"), Style::default().fg(Color::Magenta)),
+            ]));
+            lines.push(Line::from(Span::raw("")));
+        }
+
+        if let Some(ref body) = note.body {
+            for line in body.lines() {
+                lines.push(Line::from(Span::raw(line)));
+            }
+        }
+
+        let detail = Paragraph::new(lines).block(block);
+        frame.render_widget(detail, area);
+    }
+}
+</file>
+
+<file path="src/ui/mod.rs">
+pub mod dashboard;
+pub mod file_browser;
+pub mod issues;
+pub mod notes;
+pub mod popup;
+pub mod prs;
+pub mod roadmap;
+pub mod stats;
+
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Borders, Paragraph};
+use ratatui::Frame;
+
+pub fn keybinds_bar(frame: &mut Frame, area: Rect, screen: &str, input_mode: &str) {
+    let binds = match (screen, input_mode) {
+        ("dashboard", _) => " [a]dd project  [d]elete  [s]tats  [t] roadmap  [enter] open  [q]uit",
+        ("issues", "none") => " [c]reate issue  [e]dit  [Tab] focus  [x] toggle  [o] comment  [n]ote  [L] link note  [p] PRs  [/] search  [s]tats  [t] roadmap  [r] refresh  [q] back  [Q] quit",
+        ("issues", "edit") => " [Tab] switch field  [Ctrl+S] save  [Esc] cancel",
+        ("prs", "none") => " [c]reate PR  [m]erge  [o] comment  [i] issues  [/] search  [s]tats  [t] roadmap  [r] refresh  [q] back  [Q] quit",
+        ("notes", "none") => " [n]ew note  [enter] open  [d]elete  [q] back  [Q] quit",
+        _ => "",
+    };
+    let style = Style::default()
+        .bg(Color::DarkGray)
+        .fg(Color::White)
+        .add_modifier(Modifier::BOLD);
+    let msg = Paragraph::new(Line::from(Span::styled(binds, style)));
+    frame.render_widget(msg, area);
+}
+
+pub fn status_bar(frame: &mut Frame, area: Rect, text: &str, repo_info: Option<&str>) {
+    let layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Min(1), Constraint::Length(40)])
+        .split(area);
+
+    let status_style = Style::default()
+        .bg(Color::DarkGray)
+        .fg(Color::White)
+        .add_modifier(Modifier::BOLD);
+
+    let msg = Paragraph::new(Line::from(Span::styled(text, status_style)));
+    frame.render_widget(msg, layout[0]);
+
+    if let Some(repo) = repo_info {
+        let repo_style = Style::default()
+            .bg(Color::DarkGray)
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD);
+        let repo_text = Paragraph::new(Line::from(Span::styled(repo, repo_style)));
+        frame.render_widget(repo_text, layout[1]);
+    }
+}
+
+pub fn centered_rect(percent_x: u16, percent_y: u16, within: Rect) -> Rect {
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Ratio(u32::from((100 - percent_y) / 200), 1),
+            Constraint::Ratio(u32::from(percent_y), 100),
+            Constraint::Ratio(u32::from((100 - percent_y) / 200), 1),
+        ])
+        .split(within);
+
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Ratio(u32::from((100 - percent_x) / 200), 1),
+            Constraint::Ratio(u32::from(percent_x), 100),
+            Constraint::Ratio(u32::from((100 - percent_x) / 200), 1),
+        ])
+        .split(popup_layout[1])[1]
+}
+
+pub fn title_block(title: &str) -> Block {
+    Block::default()
+        .borders(Borders::ALL)
+        .title(format!(" {title} "))
+        .style(Style::default().fg(Color::Cyan))
+}
+</file>
+
+<file path="src/ui/prs.rs">
+use crate::github::{Comment, PullRequest};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
+use ratatui::Frame;
+
+pub struct PRsView {
+    pub prs: Vec<PullRequest>,
+    pub selected: usize,
+    pub filter_state: Option<String>,
+}
+
+impl PRsView {
+    pub fn new(prs: Vec<PullRequest>) -> Self {
+        Self {
+            prs,
+            selected: 0,
+            filter_state: None,
+        }
+    }
+
+    pub fn draw(&self, frame: &mut Frame, area: Rect, detail_pr: Option<&PullRequest>, comments: Option<&[Comment]>) {
+        let layout = if detail_pr.is_some() {
+            Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Ratio(2, 5), Constraint::Ratio(3, 5)])
+                .split(area)
+        } else {
+            Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Min(1), Constraint::Length(0)])
+                .split(area)
+        };
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(" Pull Requests ")
+            .style(Style::default().fg(Color::Cyan));
+        let inner = block.inner(layout[0]);
+
+        frame.render_widget(block, layout[0]);
+
+        let items: Vec<ListItem> = self
+            .prs
+            .iter()
+            .map(|pr| {
+                let checks_indicator = match pr.checks_state.as_deref() {
+                    Some("success") => "  ",
+                    Some("failure") => "  ",
+                    Some("pending") => "  ",
+                    _ => "",
+                };
+
+                let merge_indicator = match pr.mergeable.as_deref() {
+                    Some("mergeable") => "",
+                    Some("conflict") => " ⚠",
+                    _ => "",
+                };
+
+                ListItem::new(Line::from(vec![
+                    Span::styled(
+                        format!(" #{} ", pr.number),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                    Span::styled(
+                        if pr.state == "open" { " " } else { " " },
+                        Style::default().fg(if pr.state == "open" {
+                            Color::Green
+                        } else {
+                            Color::Red
+                        }),
+                    ),
+                    Span::raw(&pr.title),
+                    Span::styled(checks_indicator, Style::default().fg(Color::Green)),
+                    Span::styled(merge_indicator, Style::default().fg(Color::Red)),
+                ]))
+            })
+            .collect();
+
+        let mut list_state = ListState::default();
+        list_state.select(Some(self.selected));
+
+        let list = List::new(items)
+            .highlight_style(
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol("> ");
+
+        frame.render_stateful_widget(list, inner, &mut list_state);
+
+        if let (Some(pr), Some(comments)) = (detail_pr, comments) {
+            self.draw_detail(frame, layout[1], pr, comments);
+        } else if let Some(pr) = detail_pr {
+            self.draw_detail(frame, layout[1], pr, &[]);
+        }
+    }
+
+    fn draw_detail(&self, frame: &mut Frame, area: Rect, pr: &PullRequest, comments: &[Comment]) {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" PR #{} ", pr.number))
+            .style(Style::default().fg(Color::Cyan));
+
+        let mut lines = vec![
+            Line::from(vec![
+                Span::styled(
+                    &pr.title,
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ]),
+            Line::from(vec![
+                Span::raw(" by "),
+                Span::styled(
+                    pr.author.as_deref().unwrap_or("unknown"),
+                    Style::default().fg(Color::Cyan),
+                ),
+                Span::raw(" | "),
+                Span::styled(
+                    pr.head_branch.as_deref().unwrap_or("?"),
+                    Style::default().fg(Color::Yellow),
+                ),
+                Span::raw(" → "),
+                Span::styled(
+                    pr.base_branch.as_deref().unwrap_or("?"),
+                    Style::default().fg(Color::Yellow),
+                ),
+            ]),
+            Line::from(vec![
+                Span::raw("State: "),
+                Span::styled(
+                    &pr.state,
+                    Style::default().fg(match pr.state.as_str() {
+                        "open" => Color::Green,
+                        _ => Color::Red,
+                    }),
+                ),
+                Span::raw(" | Mergeable: "),
+                Span::styled(
+                    pr.mergeable.as_deref().unwrap_or("unknown"),
+                    Style::default().fg(match pr.mergeable.as_deref() {
+                        Some("mergeable") => Color::Green,
+                        Some("conflict") => Color::Red,
+                        _ => Color::Yellow,
+                    }),
+                ),
+                Span::raw(" | Checks: "),
+                Span::styled(
+                    pr.checks_state.as_deref().unwrap_or("?"),
+                    Style::default().fg(match pr.checks_state.as_deref() {
+                        Some("success") => Color::Green,
+                        Some("failure") => Color::Red,
+                        _ => Color::Yellow,
+                    }),
+                ),
+            ]),
+            Line::from(Span::raw("")),
+        ];
+
+        if let Some(body) = &pr.body {
+            for line in body.lines() {
+                lines.push(Line::from(Span::raw(line)));
+            }
+        }
+
+        if !comments.is_empty() {
+            lines.push(Line::from(Span::raw("")));
+            lines.push(Line::from(Span::styled(
+                format!("─── {} comments ───", comments.len()),
+                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            )));
+            lines.push(Line::from(Span::raw("")));
+
+            for comment in comments {
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        comment.author.as_deref().unwrap_or("unknown"),
+                        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        format!("  {}", comment.created_at.as_deref().unwrap_or("")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                ]));
+                if let Some(body) = &comment.body {
+                    for line in body.lines() {
+                        lines.push(Line::from(Span::raw(format!("  {line}"))));
+                    }
+                }
+                lines.push(Line::from(Span::raw("")));
+            }
+        }
+
+        let detail = Paragraph::new(lines).block(block);
+        frame.render_widget(detail, area);
+    }
+}
+</file>
+
+<file path="src/app.rs">
+use crate::cache::Cache;
+use crate::config::{self, Config};
+use crate::git;
+use crate::github::{Client, Comment, Issue, PullRequest};
+use crate::notes::{self, Note};
+use crate::ui::dashboard::Dashboard;
+use crate::ui::file_browser::FileBrowser;
+use crate::ui::issues::{FocusTarget, IssuesView};
+use crate::ui::notes::NotesView;
+use crate::ui::prs::PRsView;
+use crate::ui::roadmap::RoadmapView;
+use crate::ui::stats::StatsView;
+use crate::ui::{popup, status_bar};
+use anyhow::Result;
+use crossterm::event::{self, Event, KeyCode, KeyModifiers};
+use fuzzy_matcher::FuzzyMatcher;
+use ratatui::backend::CrosstermBackend;
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::Frame;
+use ratatui::Terminal;
+use std::collections::HashMap;
+use std::io::Stdout;
+use std::path::PathBuf;
+use std::time::Duration;
+
+#[derive(PartialEq)]
+enum Screen {
+    Dashboard,
+    Issues,
+    PullRequests,
+    Notes,
+    Stats,
+    Roadmap,
+}
+
+#[derive(PartialEq)]
+enum DetailTarget {
+    Issue,
+    Note,
+}
+
+enum InputMode {
+    None,
+    Search { query: String },
+    CreateIssue { title: String, body: String, step: u8 },
+    BrowseProject { browser: FileBrowser },
+    Comment { body: String },
+    ConfirmMerge { pr_number: u64, selected: u8 },
+    CreateNote { title: String, body: String, step: u8 },
+    CreatePr { title: String, body: String, step: u8 },
+    EditIssue { title: String, body: String, focus: u8, issue_number: u64 },
+    EditNote { title: String, body: String, focus: u8 },
+    LinkNote { input: String },
+}
+
+pub struct App {
+    config: Config,
+    cache: Cache,
+    client: Client,
+    screen: Screen,
+    input_mode: InputMode,
+    dashboard: Dashboard,
+    issues_view: IssuesView,
+    prs_view: PRsView,
+    notes_view: NotesView,
+    all_issues: Vec<Issue>,
+    all_prs: Vec<PullRequest>,
+    selected_issue: Option<Issue>,
+    selected_pr: Option<PullRequest>,
+    selected_note: Option<Note>,
+    issue_comments: HashMap<u64, Vec<Comment>>,
+    pr_comments: HashMap<u64, Vec<Comment>>,
+    repo_owner: Option<String>,
+    repo_name: Option<String>,
+    repo_path: Option<PathBuf>,
+    status: String,
+    loading: bool,
+    stats_view: StatsView,
+    roadmap_view: RoadmapView,
+    should_quit: bool,
+    project_notes: Vec<Note>,
+    selected_note_idx: usize,
+    focus: FocusTarget,
+    detail_target: DetailTarget,
+    state_filter: String,
+}
+
+impl App {
+    pub async fn new(config: Config, cache: Cache) -> Result<Self> {
+        let client = Client::new(&config);
+
+        let (repo_owner, repo_name, repo_path, status) = match git::detect_current_dir() {
+            Ok(Some(info)) => {
+                let s = format!("{}/{}", info.owner, info.repo);
+                let path = git::project_root();
+                (Some(info.owner), Some(info.repo), path, s)
+            }
+            Ok(None) => (None, None, None, "no git repo detected".to_string()),
+            Err(e) => (None, None, None, format!("{e}")),
+        };
+
+        let projects = config.projects.clone();
+        let dashboard = Dashboard::new(projects);
+
+        let project_notes = if let Some(ref path) = repo_path {
+            notes::list_notes(path).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        let notes_view = NotesView::new(project_notes.clone());
+
+        let (owner_str, repo_str) = match (&repo_owner, &repo_name) {
+            (Some(o), Some(r)) => (o.clone(), r.clone()),
+            _ => (String::new(), String::new()),
+        };
+
+        let mut app = Self {
+            config,
+            cache,
+            client,
+            screen: Screen::Dashboard,
+            input_mode: InputMode::None,
+            dashboard,
+            issues_view: IssuesView::new(Vec::new()),
+            prs_view: PRsView::new(Vec::new()),
+            notes_view,
+            all_issues: Vec::new(),
+            all_prs: Vec::new(),
+            selected_issue: None,
+            selected_pr: None,
+            selected_note: None,
+            issue_comments: HashMap::new(),
+            pr_comments: HashMap::new(),
+            repo_owner,
+            repo_name,
+            repo_path,
+            status,
+            loading: false,
+            should_quit: false,
+            stats_view: StatsView::new(&owner_str, &repo_str),
+            roadmap_view: RoadmapView::new(&owner_str, &repo_str),
+            project_notes,
+            selected_note_idx: 0,
+            focus: FocusTarget::Issues,
+            detail_target: DetailTarget::Issue,
+            state_filter: "open".to_string(),
+        };
+
+        if app.repo_owner.is_some() && app.repo_name.is_some() {
+            app.switch_to_issues().await?;
+        }
+
+        Ok(app)
+    }
+
+    pub async fn run(&mut self, terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result<()> {
+        while !self.should_quit {
+            terminal.draw(|frame| self.draw(frame))?;
+            self.handle_events().await?;
+        }
+        Ok(())
+    }
+
+    fn draw(&self, frame: &mut Frame) {
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(1), Constraint::Length(1), Constraint::Length(1)])
+            .split(frame.area());
+
+        match self.screen {
+            Screen::Dashboard => self.dashboard.draw(frame, layout[0]),
+            Screen::Issues => self.draw_issues(frame, layout[0]),
+            Screen::PullRequests => {
+                let comments = self.selected_pr.as_ref().and_then(|pr| self.pr_comments.get(&pr.number));
+                self.prs_view
+                    .draw(frame, layout[0], self.selected_pr.as_ref(), comments.map(|v| v.as_slice()));
+            }
+            Screen::Notes => self
+                .notes_view
+                .draw(frame, layout[0], self.selected_note.as_ref()),
+            Screen::Stats => self.stats_view.draw(frame, layout[0]),
+            Screen::Roadmap => self.roadmap_view.draw(frame, layout[0]),
+        }
+
+        let repo_info = self.repo_owner.as_ref().map(|o| {
+            format!("{}/{}", o, self.repo_name.as_deref().unwrap_or("?"))
+        });
+
+        let status = match &self.input_mode {
+            InputMode::Search { query } => format!("/{query}"),
+            InputMode::LinkNote { input } => format!("Link to issue #: {input}"),
+            _ => self.status.clone(),
+        };
+        status_bar(frame, layout[1], &status, repo_info.as_deref());
+
+        let (screen_str, input_str) = match &self.input_mode {
+            InputMode::None => (
+                match self.screen {
+                    Screen::Dashboard => "dashboard",
+                    Screen::Issues => "issues",
+                    Screen::PullRequests => "prs",
+                    Screen::Notes => "notes",
+                    Screen::Stats => "stats",
+                    Screen::Roadmap => "roadmap",
+                },
+                "none",
+            ),
+            InputMode::EditIssue { .. } | InputMode::EditNote { .. } => ("issues", "edit"),
+            _ => ("", ""),
+        };
+        crate::ui::keybinds_bar(frame, layout[2], screen_str, input_str);
+
+        match &self.input_mode {
+            InputMode::None => {}
+            InputMode::Search { .. } => {}
+            InputMode::CreateIssue { title, body, step } => {
+                let (prompt, value, help) = match step {
+                    0 => ("Issue title", title.as_str(), "enter to confirm, esc to cancel"),
+                    _ => ("Issue body (optional)", body.as_str(), "enter to submit, esc to skip body"),
+                };
+                popup::input_dialog(frame, frame.area(), prompt, value, help);
+            }
+            InputMode::BrowseProject { browser } => {
+                browser.draw(frame, frame.area());
+            }
+            InputMode::CreateNote { title, body, step } => {
+                let (prompt, value, help) = match step {
+                    0 => ("Note title", title.as_str(), "enter to confirm, esc to cancel"),
+                    _ => ("Note body (optional)", body.as_str(), "enter to submit, esc to skip"),
+                };
+                popup::input_dialog(frame, frame.area(), prompt, value, help);
+            }
+            InputMode::Comment { body } => {
+                popup::input_dialog(frame, frame.area(), "Comment", body, "enter to post, esc to cancel");
+            }
+            InputMode::ConfirmMerge { selected, .. } => {
+                popup::merge_dialog(frame, frame.area(), *selected as usize);
+            }
+            InputMode::CreatePr { title, body, step } => {
+                let (prompt, value, help) = match step {
+                    0 => ("PR title", title.as_str(), "enter to confirm, esc to cancel"),
+                    _ => ("PR body (optional)", body.as_str(), "enter to submit, esc to skip body"),
+                };
+                popup::input_dialog(frame, frame.area(), prompt, value, help);
+            }
+            InputMode::LinkNote { input } => {
+                popup::input_dialog(frame, frame.area(), "Link note to issue #", input, "enter to link, esc to cancel");
+            }
+            InputMode::EditIssue { .. } | InputMode::EditNote { .. } => {}
+        }
+    }
+
+    fn draw_issues(&self, frame: &mut Frame, area: Rect) {
+        let editing = match &self.input_mode {
+            InputMode::EditIssue { title, body, focus, issue_number } => {
+                Some(crate::ui::issues::EditState {
+                    title: title.clone(),
+                    body: body.clone(),
+                    field_focus: *focus,
+                    issue_number: *issue_number,
+                    note_slug: None,
+                })
+            }
+            InputMode::EditNote { title, body, focus } => {
+                Some(crate::ui::issues::EditState {
+                    title: title.clone(),
+                    body: body.clone(),
+                    field_focus: *focus,
+                    issue_number: 0,
+                    note_slug: Some(String::new()),
+                })
+            }
+            _ => None,
+        };
+        let comments = self.selected_issue.as_ref().and_then(|i| self.issue_comments.get(&i.number));
+        let detail_issue = if self.detail_target == DetailTarget::Issue {
+            self.selected_issue.as_ref()
+        } else {
+            None
+        };
+        self.issues_view.draw(
+            frame,
+            area,
+            detail_issue,
+            comments.map(|v| v.as_slice()),
+            &self.project_notes,
+            self.selected_note_idx,
+            self.focus,
+            editing.as_ref(),
+        );
+    }
+
+    async fn handle_events(&mut self) -> Result<()> {
+        if event::poll(Duration::from_millis(100))? {
+            match event::read()? {
+                Event::Key(key) => self.handle_key(key).await?,
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    async fn handle_key(&mut self, key: event::KeyEvent) -> Result<()> {
+        match &self.input_mode {
+            InputMode::EditIssue { .. } | InputMode::EditNote { .. } => self.handle_edit_key(key).await?,
+            _ => match &self.input_mode {
+                InputMode::None => match self.screen {
+                    Screen::Dashboard => self.handle_dashboard_key(key).await?,
+                    Screen::Issues => self.handle_issues_key(key).await?,
+                    Screen::PullRequests => self.handle_prs_key(key).await?,
+                    Screen::Notes => self.handle_notes_key(key).await?,
+                    Screen::Stats => self.handle_stats_key(key).await?,
+                    Screen::Roadmap => self.handle_roadmap_key(key).await?,
+                },
+                InputMode::ConfirmMerge { .. } => self.handle_merge_key(key).await?,
+                InputMode::BrowseProject { .. } => self.handle_browse_key(key).await?,
+                InputMode::LinkNote { .. } => self.handle_link_key(key).await?,
+                InputMode::Search { .. }
+                | InputMode::CreateIssue { .. }
+                | InputMode::CreateNote { .. }
+                | InputMode::CreatePr { .. }
+                | InputMode::Comment { .. } => self.handle_input_key(key).await?,
+                InputMode::EditIssue { .. } | InputMode::EditNote { .. } => unreachable!(),
+            },
+        }
+        Ok(())
+    }
+
+    async fn handle_edit_key(&mut self, key: event::KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Esc => {
+                self.input_mode = InputMode::None;
+                self.status = "edit cancelled".to_string();
+            }
+            KeyCode::Tab => {
+                match &mut self.input_mode {
+                    InputMode::EditIssue { focus, .. }
+                    | InputMode::EditNote { focus, .. } => {
+                        *focus = (*focus + 1) % 2;
+                    }
+                    _ => {}
+                }
+            }
+            KeyCode::Enter => {
+                let is_title_focused = matches!(
+                    &self.input_mode,
+                    InputMode::EditIssue { focus: 0, .. } | InputMode::EditNote { focus: 0, .. }
+                );
+                if is_title_focused {
+                    match &mut self.input_mode {
+                        InputMode::EditIssue { focus, .. }
+                        | InputMode::EditNote { focus, .. } => {
+                            *focus = 1;
+                        }
+                        _ => {}
+                    }
+                } else {
+                    match &mut self.input_mode {
+                        InputMode::EditIssue { body, .. }
+                        | InputMode::EditNote { body, .. } => {
+                            body.push('\n');
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            KeyCode::Backspace => {
+                match &mut self.input_mode {
+                    InputMode::EditIssue { title, focus: 0, .. }
+                    | InputMode::EditNote { title, focus: 0, .. } => {
+                        title.pop();
+                    }
+                    InputMode::EditIssue { body, focus: 1, .. }
+                    | InputMode::EditNote { body, focus: 1, .. } => {
+                        body.pop();
+                    }
+                    _ => {}
+                }
+            }
+            KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                let mode = std::mem::replace(&mut self.input_mode, InputMode::None);
+                match mode {
+                    InputMode::EditIssue { title, body, issue_number, .. } => {
+                        let body_opt = if body.is_empty() { None } else { Some(body.as_str()) };
+                        self.update_issue(issue_number, &title, body_opt).await?;
+                    }
+                    InputMode::EditNote { title, body, .. } => {
+                        self.create_note_local(&title, if body.is_empty() { None } else { Some(&body) }).await?;
+                        self.detail_target = DetailTarget::Note;
+                        self.focus = FocusTarget::Notes;
+                        self.selected_note_idx = 0;
+                    }
+                    _ => {
+                        self.input_mode = InputMode::None;
+                    }
+                }
+            }
+            KeyCode::Char(c) => {
+                match &mut self.input_mode {
+                    InputMode::EditIssue { title, focus: 0, .. }
+                    | InputMode::EditNote { title, focus: 0, .. } => {
+                        title.push(c);
+                    }
+                    InputMode::EditIssue { body, focus: 1, .. }
+                    | InputMode::EditNote { body, focus: 1, .. } => {
+                        body.push(c);
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    async fn handle_input_key(&mut self, key: event::KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Esc => {
+                let was_search = matches!(self.input_mode, InputMode::Search { .. });
+                self.input_mode = InputMode::None;
+                if was_search {
+                    self.restore_filter();
+                }
+            }
+            KeyCode::Enter => {
+                let mode = std::mem::replace(&mut self.input_mode, InputMode::None);
+                match mode {
+                    InputMode::Search { query } => {
+                        self.status = format!("filtered: \"{query}\"");
+                    }
+                    InputMode::CreateIssue { title, body, step } => match step {
+                        0 => {
+                            if !title.is_empty() {
+                                self.input_mode = InputMode::CreateIssue {
+                                    title,
+                                    body: String::new(),
+                                    step: 1,
+                                };
+                            } else {
+                                self.status = "title cannot be empty".to_string();
+                                self.input_mode = InputMode::None;
+                            }
+                        }
+                        _ => {
+                            self.create_issue(&title, Some(&body)).await?;
+                        }
+                    },
+                    InputMode::Comment { body } => {
+                        self.add_comment(&body).await?;
+                    }
+                    InputMode::CreateNote { title, body: _, step: 0 } => {
+                        if !title.is_empty() {
+                            self.input_mode = InputMode::CreateNote {
+                                title,
+                                body: String::new(),
+                                step: 1,
+                            };
+                        } else {
+                            self.status = "title cannot be empty".to_string();
+                            self.input_mode = InputMode::None;
+                        }
+                    }
+                    InputMode::CreateNote { title, body, .. } => {
+                        self.create_note_local(&title, Some(&body)).await?;
+                    }
+                    InputMode::CreatePr { title, body: _, step: 0 } => {
+                        if !title.is_empty() {
+                            self.input_mode = InputMode::CreatePr {
+                                title,
+                                body: String::new(),
+                                step: 1,
+                            };
+                        } else {
+                            self.status = "title cannot be empty".to_string();
+                            self.input_mode = InputMode::None;
+                        }
+                    }
+                    InputMode::CreatePr { title, body, .. } => {
+                        self.create_pr(&title, Some(&body)).await?;
+                    }
+                    InputMode::None | InputMode::ConfirmMerge { .. } | InputMode::BrowseProject { .. } => {}
+                    InputMode::LinkNote { .. } | InputMode::EditIssue { .. } | InputMode::EditNote { .. } => unreachable!(),
+                }
+            }
+            KeyCode::Backspace => {
+                if let Some(active) = self.active_input_mut() {
+                    active.pop();
+                }
+            }
+            KeyCode::Char(c) => {
+                if let Some(active) = self.active_input_mut() {
+                    active.push(c);
+                }
+            }
+            _ => {}
+        }
+
+        if matches!(&self.input_mode, InputMode::Search { .. }) {
+            self.apply_search_filter();
+        }
+
+        Ok(())
+    }
+
+    fn active_input_mut(&mut self) -> Option<&mut String> {
+        match &mut self.input_mode {
+            InputMode::Search { query } => Some(query),
+            InputMode::CreateIssue { title, step: 0, .. } => Some(title),
+            InputMode::CreateIssue { body, step: 1, .. } => Some(body),
+            InputMode::CreateNote { title, step: 0, .. } => Some(title),
+            InputMode::CreateNote { body, step: 1, .. } => Some(body),
+            InputMode::Comment { body } => Some(body),
+            InputMode::CreatePr { title, step: 0, .. } => Some(title),
+            InputMode::CreatePr { body, step: 1, .. } => Some(body),
+            InputMode::None | InputMode::ConfirmMerge { .. } | InputMode::BrowseProject { .. } => None,
+            InputMode::CreateIssue { .. } | InputMode::CreateNote { .. } => None,
+            InputMode::CreatePr { .. } | InputMode::LinkNote { .. } | InputMode::EditIssue { .. } | InputMode::EditNote { .. } => None,
+        }
+    }
+
+    // --- Dashboard key handlers ---
+    async fn handle_dashboard_key(&mut self, key: event::KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Char('q') | KeyCode::Esc => self.should_quit = true,
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.dashboard.selected = (self.dashboard.selected + 1)
+                    .min(self.dashboard.projects.len().saturating_sub(1));
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.dashboard.selected = self.dashboard.selected.saturating_sub(1);
+            }
+            KeyCode::Enter => {
+                if let Some(project) = self.dashboard.projects.get(self.dashboard.selected) {
+                    self.repo_owner = Some(project.owner.clone());
+                    self.repo_name = Some(project.repo.clone());
+                    self.repo_path = git::project_root_for(std::path::Path::new(&project.path));
+                    self.stats_view = StatsView::new(&project.owner, &project.repo);
+                    self.roadmap_view = RoadmapView::new(&project.owner, &project.repo);
+                    self.status = format!("{}/{}", project.owner, project.repo);
+                    self.switch_to_issues().await?;
+                }
+            }
+            KeyCode::Char('a') => {
+                let start = std::env::current_dir().unwrap_or_else(|_| dirs::home_dir().unwrap_or_default());
+                let browser = FileBrowser::new(&start);
+                self.input_mode = InputMode::BrowseProject { browser };
+            }
+            KeyCode::Char('n') => {
+                self.switch_to_notes().await?;
+            }
+            KeyCode::Char('s') => {
+                self.show_stats().await?;
+            }
+            KeyCode::Char('t') => {
+                self.show_roadmap().await?;
+            }
+            KeyCode::Char('d') => {
+                if !self.dashboard.projects.is_empty() {
+                    let idx = self.dashboard.selected;
+                    self.dashboard.projects.remove(idx);
+                    self.dashboard.selected = self
+                        .dashboard
+                        .selected
+                        .min(self.dashboard.projects.len().saturating_sub(1));
+                    self.config.projects = self.dashboard.projects.clone();
+                    config::save(&self.config)?;
+                    self.status = "project deleted".to_string();
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    // --- Issues key handlers ---
+    async fn handle_issues_key(&mut self, key: event::KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Char('q') => {
+                self.repo_owner = None;
+                self.repo_name = None;
+                self.repo_path = None;
+                self.status = String::new();
+                self.screen = Screen::Dashboard;
+            }
+            KeyCode::Char('Q') => self.should_quit = true,
+            KeyCode::Tab => {
+                self.focus = match self.focus {
+                    FocusTarget::Issues => FocusTarget::Notes,
+                    FocusTarget::Notes => FocusTarget::Issues,
+                };
+                self.status = match self.focus {
+                    FocusTarget::Issues => "focus: issues".to_string(),
+                    FocusTarget::Notes => "focus: notes".to_string(),
+                };
+            }
+            KeyCode::Char('j') | KeyCode::Down => {
+                match self.focus {
+                    FocusTarget::Issues => {
+                        self.issues_view.selected = (self.issues_view.selected + 1)
+                            .min(self.issues_view.issues.len().saturating_sub(1));
+                        self.selected_issue = self
+                            .issues_view
+                            .issues
+                            .get(self.issues_view.selected)
+                            .cloned();
+                        self.detail_target = DetailTarget::Issue;
+                    }
+                    FocusTarget::Notes => {
+                        self.selected_note_idx = (self.selected_note_idx + 1)
+                            .min(self.project_notes.len().saturating_sub(1));
+                        self.detail_target = DetailTarget::Note;
+                    }
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                match self.focus {
+                    FocusTarget::Issues => {
+                        self.issues_view.selected = self.issues_view.selected.saturating_sub(1);
+                        self.selected_issue = self
+                            .issues_view
+                            .issues
+                            .get(self.issues_view.selected)
+                            .cloned();
+                        self.detail_target = DetailTarget::Issue;
+                    }
+                    FocusTarget::Notes => {
+                        self.selected_note_idx = self.selected_note_idx.saturating_sub(1);
+                        self.detail_target = DetailTarget::Note;
+                    }
+                }
+            }
+            KeyCode::Enter => {
+                match self.focus {
+                    FocusTarget::Issues => {
+                        self.selected_issue = self
+                            .issues_view
+                            .issues
+                            .get(self.issues_view.selected)
+                            .cloned();
+                        self.detail_target = DetailTarget::Issue;
+                        if let Some(ref issue) = self.selected_issue {
+                            if !self.issue_comments.contains_key(&issue.number) {
+                                self.load_issue_comments(issue.number).await?;
+                            }
+                        }
+                    }
+                    FocusTarget::Notes => {
+                        self.detail_target = DetailTarget::Note;
+                    }
+                }
+            }
+            KeyCode::Char('/') => {
+                self.input_mode = InputMode::Search {
+                    query: String::new(),
+                };
+            }
+            KeyCode::Char('c') => {
+                self.input_mode = InputMode::CreateIssue {
+                    title: String::new(),
+                    body: String::new(),
+                    step: 0,
+                };
+            }
+            KeyCode::Char('x') => {
+                match self.focus {
+                    FocusTarget::Issues => {
+                        self.toggle_issue_state().await?;
+                    }
+                    FocusTarget::Notes => {
+                        self.toggle_note_state().await?;
+                    }
+                }
+            }
+            KeyCode::Char('e') => {
+                if self.focus == FocusTarget::Issues {
+                    if let Some(ref issue) = self.selected_issue {
+                        self.input_mode = InputMode::EditIssue {
+                            title: issue.title.clone(),
+                            body: issue.body.clone().unwrap_or_default(),
+                            focus: 0,
+                            issue_number: issue.number,
+                        };
+                        self.status = "editing issue (Tab to switch field, Ctrl+S save)".to_string();
+                    }
+                }
+            }
+            KeyCode::Char('o') => {
+                if self.focus == FocusTarget::Issues && self.selected_issue.is_some() {
+                    self.input_mode = InputMode::Comment {
+                        body: String::new(),
+                    };
+                }
+            }
+            KeyCode::Char('n') => {
+                self.detail_target = DetailTarget::Note;
+                self.focus = FocusTarget::Notes;
+                self.input_mode = InputMode::EditNote {
+                    title: String::new(),
+                    body: String::new(),
+                    focus: 0,
+                };
+                self.status = "new note (Tab switch, Ctrl+S save)".to_string();
+            }
+            KeyCode::Char('L') => {
+                if self.focus == FocusTarget::Notes && !self.project_notes.is_empty() {
+                    self.input_mode = InputMode::LinkNote {
+                        input: String::new(),
+                    };
+                }
+            }
+            KeyCode::Char('d') => {
+                if self.focus == FocusTarget::Notes {
+                    self.delete_selected_note().await?;
+                }
+            }
+            KeyCode::Char('p') => {
+                self.switch_to_prs().await?;
+            }
+            KeyCode::Char('s') => {
+                self.show_stats().await?;
+            }
+            KeyCode::Char('t') => {
+                self.show_roadmap().await?;
+            }
+            KeyCode::Char('r') => {
+                self.refresh_issues().await?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    async fn handle_prs_key(&mut self, key: event::KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Char('q') => {
+                self.repo_owner = None;
+                self.repo_name = None;
+                self.repo_path = None;
+                self.status = String::new();
+                self.screen = Screen::Dashboard;
+            }
+            KeyCode::Char('Q') => self.should_quit = true,
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.prs_view.selected = (self.prs_view.selected + 1)
+                    .min(self.prs_view.prs.len().saturating_sub(1));
+                self.selected_pr = self.prs_view.prs.get(self.prs_view.selected).cloned();
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.prs_view.selected = self.prs_view.selected.saturating_sub(1);
+                self.selected_pr = self.prs_view.prs.get(self.prs_view.selected).cloned();
+            }
+            KeyCode::Enter => {
+                self.selected_pr = self.prs_view.prs.get(self.prs_view.selected).cloned();
+                if let Some(ref pr) = self.selected_pr {
+                    if !self.pr_comments.contains_key(&pr.number) {
+                        self.load_pr_comments(pr.number).await?;
+                    }
+                }
+            }
+            KeyCode::Char('/') => {
+                self.input_mode = InputMode::Search {
+                    query: String::new(),
+                };
+            }
+            KeyCode::Char('c') => {
+                self.input_mode = InputMode::CreatePr {
+                    title: String::new(),
+                    body: String::new(),
+                    step: 0,
+                };
+            }
+            KeyCode::Char('m') => {
+                if let Some(pr) = &self.selected_pr {
+                    if pr.state == "open" {
+                        self.input_mode = InputMode::ConfirmMerge {
+                            pr_number: pr.number,
+                            selected: 0,
+                        };
+                    }
+                }
+            }
+            KeyCode::Char('o') => {
+                if self.selected_pr.is_some() {
+                    self.input_mode = InputMode::Comment {
+                        body: String::new(),
+                    };
+                }
+            }
+            KeyCode::Char('i') => {
+                self.switch_to_issues().await?;
+            }
+            KeyCode::Char('s') => {
+                self.show_stats().await?;
+            }
+            KeyCode::Char('t') => {
+                self.show_roadmap().await?;
+            }
+            KeyCode::Char('r') => {
+                self.refresh_prs().await?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    async fn handle_merge_key(&mut self, key: event::KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Char('1') => {
+                if let InputMode::ConfirmMerge { pr_number, .. } =
+                    std::mem::replace(&mut self.input_mode, InputMode::None)
+                {
+                    self.merge_pr(pr_number, "merge").await?;
+                }
+            }
+            KeyCode::Char('2') => {
+                if let InputMode::ConfirmMerge { pr_number, .. } =
+                    std::mem::replace(&mut self.input_mode, InputMode::None)
+                {
+                    self.merge_pr(pr_number, "squash").await?;
+                }
+            }
+            KeyCode::Char('3') => {
+                if let InputMode::ConfirmMerge { pr_number, .. } =
+                    std::mem::replace(&mut self.input_mode, InputMode::None)
+                {
+                    self.merge_pr(pr_number, "rebase").await?;
+                }
+            }
+            KeyCode::Char('j') | KeyCode::Down => {
+                if let InputMode::ConfirmMerge { ref mut selected, .. } = self.input_mode {
+                    *selected = (*selected + 1).min(2);
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                if let InputMode::ConfirmMerge { ref mut selected, .. } = self.input_mode {
+                    *selected = selected.saturating_sub(1);
+                }
+            }
+            KeyCode::Esc => {
+                self.input_mode = InputMode::None;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    async fn handle_browse_key(&mut self, key: event::KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                if let InputMode::BrowseProject { ref mut browser } = self.input_mode {
+                    browser.selected = (browser.selected + 1).min(browser.entries.len().saturating_sub(1));
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                if let InputMode::BrowseProject { ref mut browser } = self.input_mode {
+                    browser.selected = browser.selected.saturating_sub(1);
+                }
+            }
+            KeyCode::Enter => {
+                if let InputMode::BrowseProject { ref mut browser } = self.input_mode {
+                    if browser.selected_is_dir() {
+                        if let Some(path) = browser.selected_path() {
+                            browser.navigate(&path);
+                        }
+                    } else {
+                        let path = browser.selected_path();
+                        let mode = std::mem::replace(&mut self.input_mode, InputMode::None);
+                        if let InputMode::BrowseProject { browser: _ } = mode {
+                            if let Some(p) = path {
+                                let dir = if p.is_dir() { p } else { p.parent().map(|x| x.to_path_buf()).unwrap_or(p) };
+                                self.add_project(&dir.to_string_lossy()).await?;
+                            }
+                        }
+                    }
+                }
+            }
+            KeyCode::Char('h') => {
+                if let InputMode::BrowseProject { ref mut browser } = self.input_mode {
+                    browser.show_hidden = !browser.show_hidden;
+                    browser.refresh();
+                }
+            }
+            KeyCode::Esc => {
+                if let InputMode::BrowseProject { ref mut browser } = self.input_mode {
+                    browser.go_up();
+                    if browser.current_dir.parent().is_none()
+                        || browser.current_dir == PathBuf::from("/")
+                    {
+                        self.input_mode = InputMode::None;
+                    }
+                }
+            }
+            KeyCode::Char('q') => {
+                self.input_mode = InputMode::None;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    async fn handle_notes_key(&mut self, key: event::KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Char('q') => {
+                self.screen = Screen::Dashboard;
+                self.selected_note = None;
+            }
+            KeyCode::Char('Q') => self.should_quit = true,
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.notes_view.selected = (self.notes_view.selected + 1)
+                    .min(self.notes_view.notes.len().saturating_sub(1));
+                self.selected_note = self.notes_view.notes.get(self.notes_view.selected).cloned();
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.notes_view.selected = self.notes_view.selected.saturating_sub(1);
+                self.selected_note = self.notes_view.notes.get(self.notes_view.selected).cloned();
+            }
+            KeyCode::Enter => {
+                self.selected_note = self.notes_view.notes.get(self.notes_view.selected).cloned();
+            }
+            KeyCode::Char('n') => {
+                self.input_mode = InputMode::CreateNote {
+                    title: String::new(),
+                    body: String::new(),
+                    step: 0,
+                };
+            }
+            KeyCode::Char('x') => {
+                self.toggle_note_standalone_state().await?;
+            }
+            KeyCode::Char('d') => {
+                self.delete_standalone_note().await?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    async fn handle_link_key(&mut self, key: event::KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Esc => {
+                self.input_mode = InputMode::None;
+                self.status = "link cancelled".to_string();
+            }
+            KeyCode::Enter => {
+                let mode = std::mem::replace(&mut self.input_mode, InputMode::None);
+                if let InputMode::LinkNote { input } = mode {
+                    if let Ok(num) = input.trim().parse::<u64>() {
+                        self.link_selected_note(num).await?;
+                    } else if input.trim().is_empty() {
+                        self.status = "link cancelled".to_string();
+                    } else {
+                        self.status = "invalid issue number".to_string();
+                    }
+                }
+            }
+            KeyCode::Backspace => {
+                if let InputMode::LinkNote { ref mut input } = self.input_mode {
+                    input.pop();
+                }
+            }
+            KeyCode::Char(c) => {
+                if let InputMode::LinkNote { ref mut input } = self.input_mode {
+                    input.push(c);
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    // --- Actions ---
+
+    async fn create_issue(&mut self, title: &str, body: Option<&str>) -> Result<()> {
+        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
+            self.status = format!("creating issue...");
+            match self
+                .client
+                .create_issue(owner, repo, title, body, &[])
+                .await
+            {
+                Ok(issue) => {
+                    self.status = format!("created issue #{}", issue.number);
+                    self.refresh_issues().await?;
+                }
+                Err(e) => {
+                    self.status = format!("error creating issue: {e}");
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn update_issue(&mut self, number: u64, title: &str, body: Option<&str>) -> Result<()> {
+        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
+            self.status = format!("updating issue #{number}...");
+            match self.client.update_issue(owner, repo, number, title, body).await {
+                Ok(updated) => {
+                    self.status = format!("updated issue #{}", updated.number);
+                    self.refresh_issues().await?;
+                }
+                Err(e) => {
+                    self.status = format!("error updating issue: {e}");
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn toggle_issue_state(&mut self) -> Result<()> {
+        if let Some(issue) = &self.selected_issue {
+            if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
+                let new_state = if issue.state == "open" { "closed" } else { "open" };
+                self.status = format!("{} issue #{}...", new_state, issue.number);
+                match self.client.update_issue_state(owner, repo, issue.number, new_state).await {
+                    Ok(updated) => {
+                        let text = format!("issue #{} {}", updated.number, updated.state);
+                        self.refresh_issues().await?;
+                        self.status = text;
+                    }
+                    Err(e) => self.status = format!("error: {e}"),
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn add_comment(&mut self, body: &str) -> Result<()> {
+        let body = body.trim().to_string();
+        if body.is_empty() {
+            self.status = "comment cannot be empty".to_string();
+            return Ok(());
+        }
+
+        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
+            if let Some(ref issue) = self.selected_issue {
+                match self.client.create_comment(owner, repo, issue.number, &body).await {
+                    Ok(_) => self.status = "comment posted".to_string(),
+                    Err(e) => self.status = format!("error: {e}"),
+                }
+            } else if let Some(ref pr) = self.selected_pr {
+                match self.client.create_comment(owner, repo, pr.number, &body).await {
+                    Ok(_) => self.status = "comment posted".to_string(),
+                    Err(e) => self.status = format!("error: {e}"),
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn load_issue_comments(&mut self, number: u64) -> Result<()> {
+        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
+            match self.client.list_comments(owner, repo, number).await {
+                Ok(comments) => {
+                    self.issue_comments.insert(number, comments);
+                }
+                Err(e) => self.status = format!("error loading comments: {e}"),
+            }
+        }
+        Ok(())
+    }
+
+    async fn load_pr_comments(&mut self, number: u64) -> Result<()> {
+        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
+            match self.client.list_comments(owner, repo, number).await {
+                Ok(comments) => {
+                    self.pr_comments.insert(number, comments);
+                }
+                Err(e) => self.status = format!("error loading comments: {e}"),
+            }
+        }
+        Ok(())
+    }
+
+    // --- Note operations ---
+
+    async fn create_note_local(&mut self, title: &str, body: Option<&str>) -> Result<()> {
+        let issue = if self.detail_target == DetailTarget::Issue {
+            self.selected_issue.as_ref().map(|i| i.number)
+        } else {
+            None
+        };
+
+        if let Some(ref path) = self.repo_path {
+            match notes::create_note(path, title, body, "medium", issue) {
+                Ok(note) => {
+                    self.status = format!("created note: {}", note.title);
+                    self.refresh_project_notes().await?;
+                }
+                Err(e) => self.status = format!("error creating note: {e}"),
+            }
+        } else {
+            self.status = "no project directory".to_string();
+        }
+        Ok(())
+    }
+
+    async fn link_selected_note(&mut self, issue_number: u64) -> Result<()> {
+        if let Some(ref path) = self.repo_path {
+            if let Some(note) = self.project_notes.get(self.selected_note_idx) {
+                match notes::update_note(
+                    path,
+                    &note.slug,
+                    &note.title,
+                    note.body.as_deref(),
+                    &note.priority,
+                    &note.status,
+                    Some(issue_number),
+                ) {
+                    Ok(_) => {
+                        self.status = format!("linked note to issue #{issue_number}");
+                        self.refresh_project_notes().await?;
+                    }
+                    Err(e) => self.status = format!("error linking note: {e}"),
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn delete_selected_note(&mut self) -> Result<()> {
+        if let Some(ref path) = self.repo_path {
+            if let Some(note) = self.project_notes.get(self.selected_note_idx) {
+                let slug = note.slug.clone();
+                match notes::delete_note(path, &slug) {
+                    Ok(_) => {
+                        self.status = format!("deleted note: {}", note.title);
+                        self.selected_note_idx = 0;
+                        self.refresh_project_notes().await?;
+                    }
+                    Err(e) => self.status = format!("error deleting note: {e}"),
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn toggle_note_state(&mut self) -> Result<()> {
+        if let Some(ref path) = self.repo_path {
+            if let Some(note) = self.project_notes.get(self.selected_note_idx).cloned() {
+                let new_status = if note.status == "open" { "closed" } else { "open" };
+                match notes::update_note(
+                    path,
+                    &note.slug,
+                    &note.title,
+                    note.body.as_deref(),
+                    &note.priority,
+                    new_status,
+                    note.issue,
+                ) {
+                    Ok(_) => {
+                        self.status = format!("note: {}", if new_status == "open" { "reopened" } else { "closed" });
+                        self.refresh_project_notes().await?;
+                    }
+                    Err(e) => self.status = format!("error: {e}"),
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn toggle_note_standalone_state(&mut self) -> Result<()> {
+        if let Some(ref path) = self.repo_path {
+            if let Some(note) = &self.selected_note {
+                let new_status = if note.status == "open" { "closed" } else { "open" };
+                match notes::update_note(
+                    path,
+                    &note.slug,
+                    &note.title,
+                    note.body.as_deref(),
+                    &note.priority,
+                    new_status,
+                    note.issue,
+                ) {
+                    Ok(_) => {
+                        self.status = format!("note: {}", if new_status == "open" { "reopened" } else { "closed" });
+                        self.refresh_notes().await?;
+                    }
+                    Err(e) => self.status = format!("error: {e}"),
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn delete_standalone_note(&mut self) -> Result<()> {
+        if let Some(ref path) = self.repo_path {
+            if let Some(note) = &self.selected_note {
+                let slug = note.slug.clone();
+                match notes::delete_note(path, &slug) {
+                    Ok(_) => {
+                        self.status = format!("deleted note: {}", note.title);
+                        self.selected_note = None;
+                        self.refresh_notes().await?;
+                    }
+                    Err(e) => self.status = format!("error: {e}"),
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn refresh_project_notes(&mut self) -> Result<()> {
+        if let Some(ref path) = self.repo_path {
+            match notes::list_notes(path) {
+                Ok(notes) => {
+                    let count = notes.len();
+                    self.project_notes = notes;
+                    self.selected_note_idx = self.selected_note_idx.min(count.saturating_sub(1));
+                    if self.screen == Screen::Issues {
+                        self.status = format!("{count} notes");
+                    }
+                    self.notes_view = NotesView::new(self.project_notes.clone());
+                }
+                Err(e) => self.status = format!("error: {e}"),
+            }
+        }
+        Ok(())
+    }
+
+    async fn refresh_notes(&mut self) -> Result<()> {
+        if let Some(ref path) = self.repo_path {
+            match notes::list_notes(path) {
+                Ok(notes) => {
+                    let count = notes.len();
+                    self.project_notes = notes.clone();
+                    self.notes_view = NotesView::new(notes);
+                    self.selected_note = self.notes_view.notes.first().cloned();
+                    if self.screen == Screen::Notes {
+                        self.status = format!("{count} notes");
+                    }
+                }
+                Err(e) => self.status = format!("error: {e}"),
+            }
+        }
+        Ok(())
+    }
+
+    async fn switch_to_notes(&mut self) -> Result<()> {
+        self.refresh_notes().await?;
+        self.screen = Screen::Notes;
+        Ok(())
+    }
+
+    async fn merge_pr(&mut self, pr_number: u64, method: &str) -> Result<()> {
+        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
+            self.status = format!("merging PR #{pr_number} ({method})...");
+            match self.client.merge_pr(owner, repo, pr_number, method).await {
+                Ok(_) => {
+                    self.status = format!("PR #{pr_number} merged ({method})");
+                    self.refresh_prs().await?;
+                }
+                Err(e) => self.status = format!("error: {e}"),
+            }
+        }
+        Ok(())
+    }
+
+    async fn add_project(&mut self, path_str: &str) -> Result<()> {
+        let expanded = if path_str.starts_with("~/") {
+            let home = dirs::home_dir().map(|h| h.to_string_lossy().to_string()).unwrap_or_default();
+            path_str.replacen("~", &home, 1)
+        } else {
+            path_str.to_string()
+        };
+        let p = std::path::Path::new(&expanded);
+
+        if !p.exists() {
+            self.status = format!("path does not exist: {path_str}");
+            return Ok(());
+        }
+
+        match git::detect(p) {
+            Ok(Some(info)) => {
+                let name = p
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| info.repo.clone());
+
+                let project = config::Project {
+                    name,
+                    path: p.to_string_lossy().to_string(),
+                    owner: info.owner,
+                    repo: info.repo,
+                };
+
+                self.dashboard.projects.push(project.clone());
+                self.config.projects = self.dashboard.projects.clone();
+                config::save(&self.config)?;
+                self.status = format!("added {}/{}", project.owner, project.repo);
+            }
+            Ok(None) => {
+                self.status = "no GitHub repo found at that path".to_string();
+            }
+            Err(e) => self.status = format!("error: {e}"),
+        }
+        Ok(())
+    }
+
+    // --- Search ---
+
+    fn apply_search_filter(&mut self) {
+        let query = match &self.input_mode {
+            InputMode::Search { query } => query.clone(),
+            _ => return,
+        };
+
+        if query.is_empty() {
+            self.restore_filter();
+            return;
+        }
+
+        let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
+        match self.screen {
+            Screen::Issues => {
+                let filtered: Vec<Issue> = self
+                    .all_issues
+                    .iter()
+                    .filter(|i| matcher.fuzzy_match(&i.title, &query).unwrap_or(0) > 0)
+                    .cloned()
+                    .collect();
+                self.issues_view.issues = filtered;
+                self.issues_view.selected = 0;
+                self.selected_issue = self.issues_view.issues.first().cloned();
+            }
+            Screen::PullRequests => {
+                let filtered: Vec<PullRequest> = self
+                    .all_prs
+                    .iter()
+                    .filter(|pr| matcher.fuzzy_match(&pr.title, &query).unwrap_or(0) > 0)
+                    .cloned()
+                    .collect();
+                self.prs_view.prs = filtered;
+                self.prs_view.selected = 0;
+                self.selected_pr = self.prs_view.prs.first().cloned();
+            }
+            _ => {}
+        }
+    }
+
+    fn restore_filter(&mut self) {
+        self.issues_view.issues = self.all_issues.clone();
+        self.prs_view.prs = self.all_prs.clone();
+        self.issues_view.selected = self
+            .issues_view
+            .selected
+            .min(self.issues_view.issues.len().saturating_sub(1));
+        self.prs_view.selected = self
+            .prs_view
+            .selected
+            .min(self.prs_view.prs.len().saturating_sub(1));
+        self.selected_issue = self
+            .issues_view
+            .issues
+            .get(self.issues_view.selected)
+            .cloned();
+        self.selected_pr = self
+            .prs_view
+            .prs
+            .get(self.prs_view.selected)
+            .cloned();
+    }
+
+    // --- Screen switching ---
+
+    async fn switch_to_issues(&mut self) -> Result<()> {
+        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
+            self.loading = true;
+            let filter = if self.state_filter == "all" { None } else { Some(self.state_filter.as_str()) };
+            match self.client.list_issues(owner, repo, filter).await {
+                Ok(issues) => {
+                    let count = issues.len();
+                    self.all_issues = issues.clone();
+                    self.issues_view = IssuesView::new(issues);
+                    self.status = format!("{owner}/{repo} — {count} issues ({})", self.state_filter);
+                }
+                Err(e) => self.status = format!("error: {e}"),
+            }
+            self.loading = false;
+        }
+        self.selected_issue = None;
+        self.focus = FocusTarget::Issues;
+        self.detail_target = DetailTarget::Issue;
+        self.refresh_project_notes().await?;
+        self.screen = Screen::Issues;
+        Ok(())
+    }
+
+    async fn switch_to_prs(&mut self) -> Result<()> {
+        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
+            self.loading = true;
+            match self.client.list_pull_requests(owner, repo, Some("open")).await {
+                Ok(prs) => {
+                    let count = prs.len();
+                    self.all_prs = prs.clone();
+                    self.prs_view = PRsView::new(prs);
+                    self.status = format!("{owner}/{repo} — {count} PRs");
+                }
+                Err(e) => self.status = format!("error: {e}"),
+            }
+            self.loading = false;
+        }
+        self.selected_pr = None;
+        self.screen = Screen::PullRequests;
+        Ok(())
+    }
+
+    async fn refresh_issues(&mut self) -> Result<()> {
+        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
+            self.status = format!("refreshing {owner}/{repo} issues...");
+            let filter = if self.state_filter == "all" { None } else { Some(self.state_filter.as_str()) };
+            match self.client.list_issues(owner, repo, filter).await {
+                Ok(issues) => {
+                    let count = issues.len();
+                    self.all_issues = issues.clone();
+                    self.issues_view = IssuesView::new(issues);
+                    self.status = format!("{owner}/{repo} — {count} issues ({})", self.state_filter);
+                }
+                Err(e) => self.status = format!("error: {e}"),
+            }
+        }
+        Ok(())
+    }
+
+    async fn refresh_prs(&mut self) -> Result<()> {
+        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
+            self.status = format!("refreshing {owner}/{repo} PRs...");
+            match self.client.list_pull_requests(owner, repo, None).await {
+                Ok(prs) => {
+                    let count = prs.len();
+                    self.all_prs = prs.clone();
+                    self.prs_view = PRsView::new(prs);
+                    self.status = format!("{owner}/{repo} — {count} PRs (refreshed)");
+                }
+                Err(e) => self.status = format!("error: {e}"),
+            }
+        }
+        Ok(())
+    }
+
+    async fn handle_stats_key(&mut self, key: event::KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Char('q') | KeyCode::Esc => {
+                self.screen = Screen::Dashboard;
+            }
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.stats_view.selected = (self.stats_view.selected + 1)
+                    .min(self.stats_view.total_items.len().saturating_sub(1));
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.stats_view.selected = self.stats_view.selected.saturating_sub(1);
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    async fn handle_roadmap_key(&mut self, key: event::KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Char('q') | KeyCode::Esc => {
+                self.screen = Screen::Dashboard;
+            }
+            KeyCode::Char('j') | KeyCode::Down => {
+                let group_len = self.roadmap_view.groups.get(self.roadmap_view.selected_group).map(|(_, items)| items.len()).unwrap_or(0);
+                self.roadmap_view.selected_item = (self.roadmap_view.selected_item + 1)
+                    .min(group_len.saturating_sub(1));
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.roadmap_view.selected_item = self.roadmap_view.selected_item.saturating_sub(1);
+            }
+            KeyCode::Char('h') | KeyCode::Left => {
+                self.roadmap_view.selected_group = self.roadmap_view.selected_group.saturating_sub(1);
+                self.roadmap_view.selected_item = 0;
+            }
+            KeyCode::Char('l') | KeyCode::Right => {
+                self.roadmap_view.selected_group = (self.roadmap_view.selected_group + 1)
+                    .min(self.roadmap_view.groups.len().saturating_sub(1));
+                self.roadmap_view.selected_item = 0;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    async fn show_stats(&mut self) -> Result<()> {
+        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
+            self.stats_view = StatsView::new(owner, repo);
+            self.stats_view.update(&self.all_issues, &self.all_prs);
+        }
+        self.screen = Screen::Stats;
+        Ok(())
+    }
+
+    async fn show_roadmap(&mut self) -> Result<()> {
+        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
+            self.roadmap_view = RoadmapView::new(owner, repo);
+            self.roadmap_view.update(&self.all_issues);
+        }
+        self.screen = Screen::Roadmap;
+        Ok(())
+    }
+
+    async fn create_pr(&mut self, title: &str, body: Option<&str>) -> Result<()> {
+        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
+            let head = crate::git::current_branch();
+            let head = head.as_deref().unwrap_or("HEAD");
+            let base = "main";
+
+            self.status = format!("creating PR...");
+            match self.client.create_pr(owner, repo, title, body, head, base).await {
+                Ok(pr) => {
+                    self.status = format!("created PR #{}", pr.number);
+                    self.refresh_prs().await?;
+                }
+                Err(e) => {
+                    self.status = format!("error creating PR: {e}");
+                }
+            }
+        }
+        Ok(())
+    }
+}
+</file>
+
+<file path="src/cache.rs">
+use anyhow::Result;
+use crate::config::data_dir;
+use rusqlite::Connection;
+use std::path::PathBuf;
+use std::sync::Mutex;
+
+pub struct Cache {
+    conn: Mutex<Connection>,
+    path: PathBuf,
+}
+
+impl Cache {
+    pub fn new() -> Result<Self> {
+        let dir = data_dir()?;
+        std::fs::create_dir_all(&dir)?;
+        let path = dir.join("cache.db");
+
+        let conn = Connection::open(&path)?;
+        let cache = Self {
+            conn: Mutex::new(conn),
+            path,
+        };
+        cache.initialize()?;
+        Ok(cache)
+    }
+
+    fn initialize(&self) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute_batch(
+            "
+            CREATE TABLE IF NOT EXISTS issues (
+                id INTEGER PRIMARY KEY,
+                owner TEXT NOT NULL,
+                repo TEXT NOT NULL,
+                number INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                body TEXT,
+                state TEXT NOT NULL,
+                author TEXT,
+                labels TEXT,
+                assignees TEXT,
+                created_at TEXT,
+                updated_at TEXT,
+                fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(owner, repo, number)
+            );
+
+            CREATE TABLE IF NOT EXISTS pull_requests (
+                id INTEGER PRIMARY KEY,
+                owner TEXT NOT NULL,
+                repo TEXT NOT NULL,
+                number INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                body TEXT,
+                state TEXT NOT NULL,
+                author TEXT,
+                head_branch TEXT,
+                base_branch TEXT,
+                mergeable TEXT,
+                checks_state TEXT,
+                created_at TEXT,
+                updated_at TEXT,
+                fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(owner, repo, number)
+            );
+
+            CREATE TABLE IF NOT EXISTS comments (
+                id INTEGER PRIMARY KEY,
+                owner TEXT NOT NULL,
+                repo TEXT NOT NULL,
+                issue_number INTEGER,
+                pr_number INTEGER,
+                author TEXT,
+                body TEXT,
+                created_at TEXT,
+                fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_issues_repo ON issues(owner, repo);
+            CREATE INDEX IF NOT EXISTS idx_prs_repo ON pull_requests(owner, repo);
+            ",
+        )?;
+        Ok(())
+    }
+
+    pub fn path(&self) -> &PathBuf {
+        &self.path
+    }
+
+
+}
+</file>
+
+<file path="src/git.rs">
+use anyhow::{Context, Result};
+use std::path::Path;
+
+#[derive(Debug, Clone)]
+pub struct RepoInfo {
+    pub owner: String,
+    pub repo: String,
+}
+
+pub fn detect_current_dir() -> Result<Option<RepoInfo>> {
+    let cwd = std::env::current_dir()?;
+    detect(&cwd)
+}
+
+pub fn current_branch() -> Option<String> {
+    let head_path = Path::new(".git/HEAD");
+    if !head_path.exists() {
+        return None;
+    }
+    let content = std::fs::read_to_string(head_path).ok()?;
+    let content = content.trim();
+    if let Some(ref_str) = content.strip_prefix("ref: refs/heads/") {
+        Some(ref_str.to_string())
+    } else {
+        None
+    }
+}
+
+pub fn project_root() -> Option<PathBuf> {
+    let cwd = std::env::current_dir().ok()?;
+    let git_dir = find_git_dir(&cwd)?;
+    git_dir.parent().map(|p| p.to_path_buf())
+}
+
+pub fn project_root_for(path: &Path) -> Option<PathBuf> {
+    let git_dir = find_git_dir(path)?;
+    git_dir.parent().map(|p| p.to_path_buf())
+}
+
+pub fn detect(path: &Path) -> Result<Option<RepoInfo>> {
+    let git_dir = find_git_dir(path);
+    let git_dir = match git_dir {
+        Some(d) => d,
+        None => return Ok(None),
+    };
+
+    let config_path = git_dir.join("config");
+    let content = std::fs::read_to_string(&config_path)
+        .with_context(|| format!("reading {}", config_path.display()))?;
+
+    parse_remote(&content)
+}
+
+fn find_git_dir(path: &Path) -> Option<PathBuf> {
+    let mut current = Some(path);
+    while let Some(dir) = current {
+        let candidate = dir.join(".git");
+        if candidate.exists() && candidate.is_dir() {
+            return Some(candidate);
+        }
+        if let Some(parent) = dir.parent() {
+            if parent == dir {
+                break;
+            }
+            current = Some(parent);
+        } else {
+            break;
+        }
+    }
+    None
+}
+
+use std::path::PathBuf;
+
+fn parse_remote(content: &str) -> Result<Option<RepoInfo>> {
+    for line in content.lines() {
+        let line = line.trim();
+        if let Some(url) = line.strip_prefix("url = ") {
+            let url = url.trim_matches('"');
+            if let Some(info) = parse_github_url(url) {
+                return Ok(Some(info));
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn parse_github_url(url: &str) -> Option<RepoInfo> {
+    let url = url.strip_suffix(".git").unwrap_or(url);
+
+    if let Some(rest) = url.strip_prefix("https://github.com/") {
+        let parts: Vec<&str> = rest.split('/').collect();
+        if parts.len() >= 2 {
+            return Some(RepoInfo {
+                owner: parts[0].to_string(),
+                repo: parts[1].to_string(),
+            });
+        }
+    }
+
+    if let Some(rest) = url.strip_prefix("git@github.com:") {
+        let parts: Vec<&str> = rest.split('/').collect();
+        if parts.len() >= 2 {
+            return Some(RepoInfo {
+                owner: parts[0].to_string(),
+                repo: parts[1].to_string(),
+            });
+        }
+    }
+
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_https_url() {
+        let info =
+            parse_github_url("https://github.com/pebrd/vex.git").unwrap();
+        assert_eq!(info.owner, "pebrd");
+        assert_eq!(info.repo, "vex");
+    }
+
+    #[test]
+    fn test_parse_ssh_url() {
+        let info =
+            parse_github_url("git@github.com:pebrd/lumo.git").unwrap();
+        assert_eq!(info.owner, "pebrd");
+        assert_eq!(info.repo, "lumo");
+    }
+}
+</file>
+
+<file path="src/main.rs">
+mod app;
+mod cache;
+mod config;
+mod git;
+mod github;
+mod notes;
+mod ui;
+
+use anyhow::Result;
+use app::App;
+use crossterm::{
+    event::{DisableMouseCapture, EnableMouseCapture},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
+use ratatui::backend::CrosstermBackend;
+use ratatui::Terminal;
+use std::io;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let args: Vec<String> = std::env::args().collect();
+
+    // Quick capture: vex add <title>
+    if args.len() >= 3 && args[1] == "add" {
+        let title = &args[2];
+        let mut body = None::<String>;
+        let mut priority = "medium";
+
+        let mut i = 3;
+        while i < args.len() {
+            match args[i].as_str() {
+                "--body" | "-b" => {
+                    if i + 1 < args.len() {
+                        body = Some(args[i + 1].clone());
+                        i += 1;
+                    }
+                }
+                "--priority" | "-p" => {
+                    if i + 1 < args.len() {
+                        priority = &args[i + 1];
+                        i += 1;
+                    }
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+
+        let project_dir = std::env::current_dir()?;
+        match notes::create_note(&project_dir, title, body.as_deref(), priority, None) {
+            Ok(note) => {
+                println!("Created note: {}", note.title);
+            }
+            Err(e) => eprintln!("Error: {e}"),
+        }
+        return Ok(());
+    }
+
+    let config = config::load()?;
+    let cache = cache::Cache::new()?;
+
+    let mut app = App::new(config, cache).await?;
+
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    let res = app.run(&mut terminal).await;
+
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
+
+    if let Err(e) = res {
+        eprintln!("Error: {e:#}");
+    }
+
+    Ok(())
+}
+</file>
+
+<file path=".gitignore">
+# Binaries and build artifacts
+/target/
+**/target/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example  # Allow example env file
+config.toml
+secrets.json
+*.env
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Documentation build artifacts (if any)
+docs/superpowers/
+
+# Misc
+*.bak
+*.tmp
+</file>
+
+</files>
