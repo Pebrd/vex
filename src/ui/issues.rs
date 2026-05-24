@@ -216,15 +216,17 @@ impl IssuesView {
 
     fn draw_detail_editing(&self, frame: &mut Frame, area: Rect, editing: &EditState) {
         let is_note = editing.note_slug.is_some();
+        let label_count = editing.labels.len();
         let title_text = if is_note {
             " Editing Note ".to_string()
         } else if editing.issue_number == 0 {
-            let label_count = editing.labels.len();
             if label_count > 0 {
                 format!(" Creating Issue ({} label{}) ", label_count, if label_count == 1 { "" } else { "s" })
             } else {
                 " Creating Issue ".to_string()
             }
+        } else if label_count > 0 {
+            format!(" Editing Issue #{} ({} label{}) ", editing.issue_number, label_count, if label_count == 1 { "" } else { "s" })
         } else {
             format!(" Editing Issue #{} ", editing.issue_number)
         };
@@ -234,7 +236,7 @@ impl IssuesView {
             .style(Style::default().fg(Color::Yellow));
         let inner = block.inner(area);
 
-        let has_label_tags = editing.issue_number == 0 && !editing.labels.is_empty() && editing.field_focus != 2;
+        let has_label_tags = !editing.available_labels.is_empty() && !editing.labels.is_empty() && editing.field_focus != 2;
         let mut constraints = vec![
             Constraint::Length(3),
             Constraint::Min(1),
@@ -266,7 +268,7 @@ impl IssuesView {
         let title_text = Paragraph::new(Line::from(title_spans)).block(title_block);
         frame.render_widget(title_text, chunks[0]);
 
-        if editing.field_focus == 2 && editing.issue_number == 0 {
+        if editing.field_focus == 2 {
             let label_style = Style::default().bg(Color::DarkGray).fg(Color::White);
             let label_ptr = "▶ ";
             let title = format!("{label_ptr}Labels ({}/{} selected)", editing.labels.len(), editing.available_labels.len());
