@@ -1,92 +1,104 @@
 # vex
 
-<div align="center">
-  <img src="vex-banner.svg" alt="vex banner">
-</div>
-
-Lightweight TUI for GitHub issues and pull requests
-
-## Description
-
-vex is a terminal user interface (TUI) application designed to interact with GitHub issues and pull requests efficiently. Built with Rust, it leverages the ratatui and crossterm libraries for a responsive and interactive terminal experience.
+Terminal UI for GitHub issues and pull requests.
 
 ## Features
 
-- Browse and filter GitHub issues and pull requests
-- View detailed information about issues and PRs
-- Interact with GitHub directly from your terminal
-- Lightweight and fast performance
+- Dashboard with project management
+- Browse and filter issues / PRs from any repo
+- Create issues with labels
+- Edit issue title, body, and labels inline
+- Close / reopen issues
+- Add comments
+- Create and merge pull requests
+- File-based local notes (`.vex/*.md`) with priority, status, and issue linking
+- Inline comments on Enter
+- Fuzzy search (`/`)
+- Filter by state (`f` cycles open → all → closed)
+- Stats overview (`s`)
+- Roadmap grouped by label (`t`)
+- Quick capture CLI: `vex add <title> [--body "..."] [--priority high]`
+- Caches API responses offline
+- Works with any GitHub repo
 
 ## Installation
 
-### Prerequisites
+```bash
+cargo install --git https://github.com/Pebrd/vex.git
+```
 
-- Rust toolchain (version 1.56 or later)
-- GitHub account and personal access token (for API access)
+Or build from source:
 
-### Build from Source
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/vex.git
-   cd vex
-   ```
-
-2. Build the project:
-   ```bash
-   cargo build --release
-   ```
-
-3. The binary will be available at `target/release/vex`
+```bash
+git clone https://github.com/Pebrd/vex.git
+cd vex
+cargo install --path .
+```
 
 ## Usage
 
-Run the application with your GitHub personal access token:
-
 ```bash
-vex --token YOUR_GITHUB_TOKEN
-```
-
-Or set the token as an environment variable:
-
-```bash
-export GITHUB_TOKEN=YOUR_GITHUB_TOKEN
 vex
 ```
 
-## Configuration
+vex will auto-detect the GitHub repo if you're in a git directory with a GitHub remote. Otherwise, press `a` to add a project from the dashboard.
 
-vex can be configured via a TOML file located at `$HOME/.config/vex/config.toml` (or platform equivalent). See the [configuration wiki](docs/wiki/configuration.md) for details.
+### Keybindings
+
+| Key | Action |
+|---|---|
+| `j`/`k` | Navigate up/down |
+| `Tab` | Switch focus (issues ↔ notes) |
+| `Enter` | View inline comments |
+| `/` | Fuzzy search |
+| `c` | Create issue / create PR (in PRs view) |
+| `e` | Edit issue inline |
+| `x` | Toggle open/closed |
+| `o` | Add comment |
+| `n` | New note |
+| `L` | Link note to issue |
+| `d` | Delete note |
+| `m` | Merge PR (then 1=squash, 2=rebase, 3=merge) |
+| `f` | Cycle filter (open → all → closed) |
+| `s` | Stats view |
+| `t` | Roadmap view |
+| `p` | Switch to PRs view |
+| `i` | Switch to Issues view |
+| `r` | Refresh |
+| `q` | Back |
+| `Q` | Quit |
+
+### Configuration
+
+Config file at `~/.config/vex/config.toml`:
+
+```toml
+token = "ghp_..."  # optional — falls back to `gh auth token`
+[[projects]]
+name = "my-project"
+path = "/home/user/projects/my-project"
+owner = "myuser"
+repo = "my-repo"
+```
+
+Projects are added automatically via the dashboard (`a` → file browser).
+
+### Quick Capture
+
+```bash
+vex add "Fix the login bug" --body "Investigate the auth flow" --priority high
+```
 
 ## Dependencies
 
-- [ratatui](https://github.com/ratatui/ratatui) - Terminal user interface library
-- [crossterm](https://github.com/crossterm-rs/crossterm) - Cross-platform terminal manipulation
-- [tokio](https://tokio.rs) - Asynchronous runtime
-- [reqwest](https://github.com/seanmonstar/reqwest) - HTTP client
-- [serde](https://serde.rs) - Serialization framework
-- [rusqlite](https://github.com/rusqlite/rusqlite) - SQLite bindings
-- [chrono](https://github.com/chronotope/chrono) - Date and time handling
-- [dirs](https://github.com/rust-lang-nursery/dirs) - Directory resolution
-- [anyhow](https://github.com/dtolnay/anyhow) - Error handling
-- [fuzzy-matcher](https://github.com/rapiz1/fuzzy-matcher) - Fuzzy string matching
+- [ratatui](https://github.com/ratatui/ratatui) — TUI framework
+- [crossterm](https://github.com/crossterm-rs/crossterm) — terminal control
+- [tokio](https://tokio.rs) — async runtime
+- [reqwest](https://github.com/seanmonstar/reqwest) — HTTP client
+- [rusqlite](https://github.com/rusqlite/rusqlite) — SQLite (API cache only)
+- [serde](https://serde.rs) — serialization
+- [fuzzy-matcher](https://github.com/rapiz1/fuzzy-matcher) — fuzzy search
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## Contact
-
-Pebrd - [https://github.com/Pebrd](https://github.com/Pebrd)
-
-Project Link: [https://github.com/Pebrd/vex](https://github.com/Pebrd/vex)
+MIT
