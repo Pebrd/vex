@@ -8,6 +8,14 @@ pub struct Config {
     pub projects: Vec<Project>,
     #[serde(default = "default_true")]
     pub mouse_enabled: bool,
+    #[serde(default)]
+    pub default_filter: Option<String>,
+    #[serde(default)]
+    pub last_owner: Option<String>,
+    #[serde(default)]
+    pub last_repo: Option<String>,
+    #[serde(default)]
+    pub last_path: Option<String>,
 }
 
 fn default_true() -> bool { true }
@@ -26,6 +34,10 @@ impl Default for Config {
             token: String::new(),
             projects: Vec::new(),
             mouse_enabled: true,
+            default_filter: None,
+            last_owner: None,
+            last_repo: None,
+            last_path: None,
         }
     }
 }

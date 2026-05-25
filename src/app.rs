@@ -13,12 +13,23 @@ use crate::ui::stats::StatsView;
 use crate::ui::{popup, status_bar};
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum SortMode {
+    CreatedNewest,
+    CreatedOldest,
+    Updated,
+    Number,
+    State,
+}
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::widgets::{Clear, Paragraph};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use crate::ui::centered_rect;
 use ratatui::Frame;
 use ratatui::Terminal;
 use std::collections::HashMap;
@@ -62,15 +73,14 @@ enum InputMode {
     CreateNote { title: String, body: String, step: u8 },
     CreatePr { title: String, body: String, step: u8 },
     EditIssue { title: String, body: String, focus: u8, issue_number: u64, labels: Vec<String>, available_labels: Vec<String>, label_idx: usize },
-    EditNote { title: String, body: String, focus: u8 },
+    EditNote { slug: Option<String>, title: String, body: String, focus: u8 },
     LinkNote { input: String },
     CreateRepo { name: String, private: bool, step: u8 },
 }
 
 pub struct App {
     config: Config,
-    #[allow(dead_code)]
-    cache: Cache,
+    cache: Arc<Cache>,
     client: Arc<Client>,
     cmd_tx: mpsc::UnboundedSender<BgEvent>,
     cmd_rx: mpsc::UnboundedReceiver<BgEvent>,
@@ -103,6 +113,14 @@ pub struct App {
     state_filter: String,
     search_matcher: SkimMatcherV2,
     last_search_press: Option<Instant>,
+    last_fetched: Option<Instant>,
+    sort_mode: SortMode,
+    detail_scroll: u16,
+    show_help: bool,
+    #[allow(dead_code)]
+    label_filter: Option<String>,
+    #[allow(dead_code)]
+    available_labels: Vec<String>,
 }
 
 impl App {
@@ -140,9 +158,11 @@ impl App {
             _ => (String::new(), String::new()),
         };
 
+        let default_filter = config.default_filter.clone().unwrap_or_else(|| "open".to_string());
+
         let mut app = Self {
             config,
-            cache,
+            cache: Arc::new(cache),
             client,
             cmd_tx,
             cmd_rx,
@@ -172,12 +192,24 @@ impl App {
             selected_note_idx: 0,
             focus: FocusTarget::Issues,
             detail_target: DetailTarget::Issue,
-            state_filter: "open".to_string(),
+            state_filter: default_filter,
             search_matcher: SkimMatcherV2::default(),
             last_search_press: None,
+            last_fetched: None,
+            sort_mode: SortMode::CreatedNewest,
+            detail_scroll: 0,
+            show_help: false,
+            label_filter: None,
+            available_labels: Vec::new(),
         };
 
         if app.repo_owner.is_some() && app.repo_name.is_some() {
+            app.switch_to_issues().await?;
+        } else if let (Some(owner), Some(repo), Some(path)) = (&app.config.last_owner, &app.config.last_repo, &app.config.last_path) {
+            app.repo_owner = Some(owner.clone());
+            app.repo_name = Some(repo.clone());
+            app.repo_path = Some(std::path::PathBuf::from(path));
+            app.status = format!("{owner}/{repo} (restored)");
             app.switch_to_issues().await?;
         }
 
@@ -193,11 +225,60 @@ impl App {
             self.drain_bg_events();
             self.handle_events().await?;
         }
+        self.config.last_owner = self.repo_owner.clone();
+        self.config.last_repo = self.repo_name.clone();
+        self.config.last_path = self.repo_path.as_ref().map(|p| p.to_string_lossy().to_string());
+        let _ = config::save(&self.config);
         Ok(())
     }
 
     fn mark_dirty(&mut self) {
         self.needs_redraw = true;
+    }
+
+    fn apply_label_filter(&self) -> Vec<Issue> {
+        match &self.label_filter {
+            Some(label) => self.all_issues.iter().filter(|i| i.labels.contains(label)).cloned().collect(),
+            None => self.all_issues.clone(),
+        }
+    }
+
+    fn apply_sort(&mut self) {
+        match self.sort_mode {
+            SortMode::CreatedNewest => {
+                self.issues_view.issues.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+                self.all_issues.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+            }
+            SortMode::CreatedOldest => {
+                self.issues_view.issues.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+                self.all_issues.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+            }
+            SortMode::Updated => {
+                self.issues_view.issues.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+                self.all_issues.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+            }
+            SortMode::Number => {
+                self.issues_view.issues.sort_by(|a, b| a.number.cmp(&b.number));
+                self.all_issues.sort_by(|a, b| a.number.cmp(&b.number));
+            }
+            SortMode::State => {
+                self.issues_view.issues.sort_by(|a, b| a.state.cmp(&b.state));
+                self.all_issues.sort_by(|a, b| a.state.cmp(&b.state));
+            }
+        }
+        self.issues_view.selected = self.issues_view.selected.min(self.issues_view.issues.len().saturating_sub(1));
+        self.selected_issue = self.issues_view.issues.get(self.issues_view.selected).cloned();
+    }
+
+    fn go_to_dashboard(&mut self) {
+        self.repo_owner = None;
+        self.repo_name = None;
+        self.repo_path = None;
+        self.selected_issue = None;
+        self.selected_pr = None;
+        self.selected_note = None;
+        self.status = String::new();
+        self.screen = Screen::Dashboard;
     }
 
     fn drain_bg_events(&mut self) {
@@ -207,13 +288,16 @@ impl App {
                     self.all_issues = issues;
                     let count = self.all_issues.len();
                     if !matches!(&self.input_mode, InputMode::Search { .. }) {
-                        self.issues_view = IssuesView::new(self.all_issues.clone());
+                        self.issues_view = IssuesView::new(self.apply_label_filter());
+                        self.apply_sort();
+                        self.issues_view.issues = self.apply_label_filter();
                     }
                     if let Some(ref owner) = self.repo_owner {
                         if let Some(ref repo) = self.repo_name {
                             self.status = format!("{owner}/{repo} — {count} issues ({})", self.state_filter);
                         }
                     }
+                    self.last_fetched = Some(Instant::now());
                     self.loading = false;
                     self.mark_dirty();
                 }
@@ -230,6 +314,7 @@ impl App {
                             }
                         }
                     }
+                    self.last_fetched = Some(Instant::now());
                     self.loading = false;
                     self.mark_dirty();
                 }
@@ -296,10 +381,19 @@ impl App {
             format!("{}/{}", o, self.repo_name.as_deref().unwrap_or("?"))
         });
 
+        let fetch_info = self.last_fetched.map(|t| {
+            let secs = t.elapsed().as_secs();
+            if secs < 60 {
+                format!(" [{}s ago]", secs)
+            } else {
+                format!(" [{}m ago]", secs / 60)
+            }
+        }).unwrap_or_default();
+
         let status = match &self.input_mode {
             InputMode::Search { query } => format!("/{query}"),
             InputMode::LinkNote { input } => format!("Link to issue #: {input}"),
-            _ => self.status.clone(),
+            _ => format!("{}{}", self.status, fetch_info),
         };
         status_bar(frame, layout[1], &status, repo_info.as_deref());
 
@@ -358,6 +452,109 @@ impl App {
             }
             InputMode::EditIssue { .. } | InputMode::EditNote { .. } => {}
         }
+
+        if self.show_help {
+            self.draw_help(frame);
+        }
+    }
+
+    fn draw_help(&self, frame: &mut Frame) {
+        let screen_help = match self.screen {
+            Screen::Dashboard => vec![
+                "j/k         navigate projects",
+                "Enter       open project",
+                "a           add project",
+                "d           delete project",
+                "s           stats screen",
+                "t           roadmap screen",
+                "q           quit",
+            ],
+            Screen::Issues => vec![
+                "j/k         navigate issues",
+                "Enter       open detail",
+                "Tab         switch focus (issues/notes)",
+                "/           search",
+                "f           cycle filter (open/all/closed)",
+                "S           cycle sort order",
+                "l           cycle label filter",
+                "c           create issue",
+                "e           edit issue",
+                "x           toggle open/closed",
+                "o           add comment",
+                "n           new linked note",
+                "L           link note to issue",
+                "d           delete linked note",
+                "O           open in browser",
+                "p           pull requests screen",
+                "s           stats screen",
+                "t           roadmap screen",
+                "r           refresh",
+                "Ctrl+d/u    scroll detail",
+                "mouse wheel scroll detail",
+                "g           dashboard",
+            ],
+            Screen::PullRequests => vec![
+                "j/k         navigate PRs",
+                "Enter       open detail",
+                "/           search",
+                "o           add comment",
+                "O           open in browser",
+                "m           merge PR",
+                "c           create PR",
+                "i           issues screen",
+                "s           stats screen",
+                "t           roadmap screen",
+                "r           refresh",
+                "g           dashboard",
+            ],
+            Screen::Notes => vec![
+                "j/k         navigate notes",
+                "Enter       open detail",
+                "/           search",
+                "n           create note",
+                "E           edit note",
+                "x           toggle open/closed",
+                "d           delete note",
+                "g           dashboard",
+            ],
+            Screen::Stats => vec![
+                "j/k         navigate",
+                "q           back",
+                "g           dashboard",
+            ],
+            Screen::Roadmap => vec![
+                "h/j/k/l     navigate",
+                "q           back",
+                "g           dashboard",
+            ],
+        };
+
+        let width = 52usize;
+        let mut lines = vec![
+            Line::from(Span::styled(
+                format!(" {:^width$} ", " Help ", width = width - 2),
+                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            )),
+            Line::from(Span::raw("")),
+        ];
+        for line in screen_help {
+            let padded = format!(" {:<width$}", line, width = width - 1);
+            lines.push(Line::from(Span::raw(padded)));
+        }
+        lines.push(Line::from(Span::raw("")));
+        lines.push(Line::from(Span::styled(
+            " Press any key to close ",
+            Style::default().fg(Color::DarkGray),
+        )));
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .style(Style::default().fg(Color::Cyan))
+            .title(" Keybindings ");
+        let para = Paragraph::new(lines).block(block);
+        let area = centered_rect(60, 50, frame.area());
+        frame.render_widget(Clear, area);
+        frame.render_widget(para, area);
     }
 
     fn draw_issues(&mut self, frame: &mut Frame, area: Rect) {
@@ -374,7 +571,7 @@ impl App {
                     label_idx: *label_idx,
                 })
             }
-            InputMode::EditNote { title, body, focus } => {
+            InputMode::EditNote { slug: _, title, body, focus } => {
                 Some(crate::ui::issues::EditState {
                     title: title.clone(),
                     body: body.clone(),
@@ -403,17 +600,36 @@ impl App {
             self.selected_note_idx,
             self.focus,
             editing.as_ref(),
+            self.detail_scroll,
         );
     }
 
     fn spawn_load_issues(&self) {
         if let (Some(owner), Some(repo)) = (self.repo_owner.clone(), self.repo_name.clone()) {
+            if let Some(cached) = self.cache.get_issues(&owner, &repo) {
+                let filtered: Vec<Issue> = if self.state_filter == "all" {
+                    cached
+                } else {
+                    cached.into_iter().filter(|i| i.state == self.state_filter).collect()
+                };
+                if !filtered.is_empty() {
+                    let _ = self.cmd_tx.send(BgEvent::IssuesReady(filtered));
+                    return;
+                }
+            }
+
             let filter = if self.state_filter == "all" { None } else { Some(self.state_filter.clone()) };
             let tx = self.cmd_tx.clone();
             let client = self.client.clone();
+            let cache = self.cache.clone();
+            let owner_c = owner.clone();
+            let repo_c = repo.clone();
             tokio::spawn(async move {
                 match client.list_issues(&owner, &repo, filter.as_deref()).await {
-                    Ok(issues) => { let _ = tx.send(BgEvent::IssuesReady(issues)); }
+                    Ok(issues) => {
+                        cache.set_issues(&owner_c, &repo_c, &issues);
+                        let _ = tx.send(BgEvent::IssuesReady(issues));
+                    }
                     Err(e) => { let _ = tx.send(BgEvent::Error(format!("{e}"))); }
                 }
             });
@@ -422,11 +638,22 @@ impl App {
 
     fn spawn_load_prs(&self) {
         if let (Some(owner), Some(repo)) = (self.repo_owner.clone(), self.repo_name.clone()) {
+            if let Some(cached) = self.cache.get_prs(&owner, &repo) {
+                let _ = self.cmd_tx.send(BgEvent::PRsReady(cached));
+                return;
+            }
+
             let tx = self.cmd_tx.clone();
             let client = self.client.clone();
+            let cache = self.cache.clone();
+            let owner_c = owner.clone();
+            let repo_c = repo.clone();
             tokio::spawn(async move {
                 match client.list_pull_requests(&owner, &repo, Some("open")).await {
-                    Ok(prs) => { let _ = tx.send(BgEvent::PRsReady(prs)); }
+                    Ok(prs) => {
+                        cache.set_prs(&owner_c, &repo_c, &prs);
+                        let _ = tx.send(BgEvent::PRsReady(prs));
+                    }
                     Err(e) => { let _ = tx.send(BgEvent::Error(format!("{e}"))); }
                 }
             });
@@ -435,11 +662,22 @@ impl App {
 
     fn spawn_load_comments(&self, number: u64) {
         if let (Some(owner), Some(repo)) = (self.repo_owner.clone(), self.repo_name.clone()) {
+            if let Some(cached) = self.cache.get_comments(&owner, &repo, number) {
+                let _ = self.cmd_tx.send(BgEvent::CommentsReady(number, cached));
+                return;
+            }
+
             let tx = self.cmd_tx.clone();
             let client = self.client.clone();
+            let cache = self.cache.clone();
+            let owner_c = owner.clone();
+            let repo_c = repo.clone();
             tokio::spawn(async move {
                 match client.list_comments(&owner, &repo, number).await {
-                    Ok(comments) => { let _ = tx.send(BgEvent::CommentsReady(number, comments)); }
+                    Ok(comments) => {
+                        cache.set_comments(&owner_c, &repo_c, number, &comments);
+                        let _ = tx.send(BgEvent::CommentsReady(number, comments));
+                    }
                     Err(e) => { let _ = tx.send(BgEvent::Error(format!("{e}"))); }
                 }
             });
@@ -713,15 +951,19 @@ impl App {
                 self.dashboard.selected = self.dashboard.selected.saturating_sub(1);
             }
             Screen::Issues => {
-                match self.focus {
-                    FocusTarget::Issues => {
-                        self.issues_view.selected = self.issues_view.selected.saturating_sub(1);
-                        self.selected_issue = self.issues_view.issues.get(self.issues_view.selected).cloned();
-                        self.detail_target = DetailTarget::Issue;
-                    }
-                    FocusTarget::Notes => {
-                        self.selected_note_idx = self.selected_note_idx.saturating_sub(1);
-                        self.detail_target = DetailTarget::Note;
+                if self.selected_issue.is_some() {
+                    self.detail_scroll = self.detail_scroll.saturating_sub(3);
+                } else {
+                    match self.focus {
+                        FocusTarget::Issues => {
+                            self.issues_view.selected = self.issues_view.selected.saturating_sub(1);
+                            self.selected_issue = self.issues_view.issues.get(self.issues_view.selected).cloned();
+                            self.detail_target = DetailTarget::Issue;
+                        }
+                        FocusTarget::Notes => {
+                            self.selected_note_idx = self.selected_note_idx.saturating_sub(1);
+                            self.detail_target = DetailTarget::Note;
+                        }
                     }
                 }
             }
@@ -751,18 +993,22 @@ impl App {
                     .min(self.dashboard.projects.len().saturating_sub(1));
             }
             Screen::Issues => {
-                match self.focus {
-                    FocusTarget::Issues => {
-                        self.issues_view.selected = (self.issues_view.selected + 1)
-                            .min(self.issues_view.issues.len().saturating_sub(1));
-                        self.selected_issue = self.issues_view.issues.get(self.issues_view.selected).cloned();
-                        self.detail_target = DetailTarget::Issue;
-                    }
-                    FocusTarget::Notes => {
+                if self.selected_issue.is_some() {
+                    self.detail_scroll = self.detail_scroll.saturating_add(3);
+                } else {
+                    match self.focus {
+                        FocusTarget::Issues => {
+                            self.issues_view.selected = (self.issues_view.selected + 1)
+                                .min(self.issues_view.issues.len().saturating_sub(1));
+                            self.selected_issue = self.issues_view.issues.get(self.issues_view.selected).cloned();
+                            self.detail_target = DetailTarget::Issue;
+                        },
+                        FocusTarget::Notes => {
                         self.selected_note_idx = (self.selected_note_idx + 1)
                             .min(self.project_notes.len().saturating_sub(1));
                         self.detail_target = DetailTarget::Note;
                     }
+                }
                 }
             }
             Screen::PullRequests => {
@@ -789,6 +1035,14 @@ impl App {
     }
 
     async fn handle_key(&mut self, key: event::KeyEvent) -> Result<()> {
+        if self.show_help {
+            self.show_help = false;
+            return Ok(());
+        }
+        if key.code == KeyCode::Char('?') {
+            self.show_help = true;
+            return Ok(());
+        }
         match &self.input_mode {
             InputMode::EditIssue { .. } | InputMode::EditNote { .. } => self.handle_edit_key(key).await?,
             _ => match &self.input_mode {
@@ -940,8 +1194,12 @@ impl App {
                             self.update_issue(issue_number, &title, body_opt, &labels).await?;
                         }
                     }
-                    InputMode::EditNote { title, body, .. } => {
-                        self.create_note_local(&title, if body.is_empty() { None } else { Some(&body) }).await?;
+                    InputMode::EditNote { slug, title, body, .. } => {
+                        if let Some(s) = slug {
+                            self.update_note_local(&s, &title, if body.is_empty() { None } else { Some(&body) }).await?;
+                        } else {
+                            self.create_note_local(&title, if body.is_empty() { None } else { Some(&body) }).await?;
+                        }
                         self.detail_target = DetailTarget::Note;
                         self.focus = FocusTarget::Notes;
                         self.selected_note_idx = 0;
@@ -1128,13 +1386,8 @@ impl App {
     // --- Issues key handlers ---
     async fn handle_issues_key(&mut self, key: event::KeyEvent) -> Result<()> {
         match key.code {
-            KeyCode::Char('q') => {
-                self.repo_owner = None;
-                self.repo_name = None;
-                self.repo_path = None;
-                self.status = String::new();
-                self.screen = Screen::Dashboard;
-            }
+            KeyCode::Char('q') => self.go_to_dashboard(),
+            KeyCode::Char('g') => self.go_to_dashboard(),
             KeyCode::Char('Q') => self.should_quit = true,
             KeyCode::Tab => {
                 self.focus = match self.focus {
@@ -1151,6 +1404,7 @@ impl App {
                     FocusTarget::Issues => {
                         self.issues_view.selected = (self.issues_view.selected + 1)
                             .min(self.issues_view.issues.len().saturating_sub(1));
+                        self.detail_scroll = 0;
                         self.selected_issue = self
                             .issues_view
                             .issues
@@ -1169,6 +1423,7 @@ impl App {
                 match self.focus {
                     FocusTarget::Issues => {
                         self.issues_view.selected = self.issues_view.selected.saturating_sub(1);
+                        self.detail_scroll = 0;
                         self.selected_issue = self
                             .issues_view
                             .issues
@@ -1182,9 +1437,22 @@ impl App {
                     }
                 }
             }
+            KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if self.selected_issue.is_some() {
+                    self.detail_scroll = self.detail_scroll.saturating_add(5);
+                    self.mark_dirty();
+                }
+            }
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if self.selected_issue.is_some() {
+                    self.detail_scroll = self.detail_scroll.saturating_sub(5);
+                    self.mark_dirty();
+                }
+            }
             KeyCode::Enter => {
                 match self.focus {
                     FocusTarget::Issues => {
+                        self.detail_scroll = 0;
                         self.selected_issue = self
                             .issues_view
                             .issues
@@ -1268,10 +1536,18 @@ impl App {
                     };
                 }
             }
+            KeyCode::Char('O') => {
+                if let (Some(owner), Some(repo), Some(ref issue)) = (&self.repo_owner, &self.repo_name, self.selected_issue.clone()) {
+                    let url = format!("https://github.com/{owner}/{repo}/issues/{}", issue.number);
+                    let _ = webbrowser::open(&url);
+                    self.status = format!("opened: {url}");
+                }
+            }
             KeyCode::Char('n') => {
                 self.detail_target = DetailTarget::Note;
                 self.focus = FocusTarget::Notes;
-                self.input_mode = InputMode::EditNote {
+                self.input_mode =             InputMode::EditNote {
+                    slug: None,
                     title: String::new(),
                     body: String::new(),
                     focus: 0,
@@ -1305,8 +1581,44 @@ impl App {
                     "all" => "closed".to_string(),
                     _ => "open".to_string(),
                 };
+                self.config.default_filter = Some(self.state_filter.clone());
+                let _ = config::save(&self.config);
                 self.status = format!("filter: {}", self.state_filter);
                 self.refresh_issues().await?;
+            }
+            KeyCode::Char('l') => {
+                if self.available_labels.is_empty() {
+                    if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
+                        self.available_labels = self.client.list_labels(owner, repo).await.unwrap_or_default();
+                    }
+                }
+                if self.available_labels.is_empty() {
+                    self.status = "no labels available".to_string();
+                } else {
+                    let current = self.label_filter.as_deref().unwrap_or("");
+                    let idx = self.available_labels.iter().position(|l| l == current).map(|i| i + 1).unwrap_or(0);
+                    if idx >= self.available_labels.len() {
+                        self.label_filter = None;
+                        self.status = "label filter: none".to_string();
+                    } else {
+                        self.label_filter = Some(self.available_labels[idx].clone());
+                        self.status = format!("label filter: {}", self.available_labels[idx]);
+                    }
+                    self.issues_view.issues = self.apply_label_filter();
+                    self.issues_view.selected = self.issues_view.selected.min(self.issues_view.issues.len().saturating_sub(1));
+                    self.selected_issue = self.issues_view.issues.get(self.issues_view.selected).cloned();
+                }
+            }
+            KeyCode::Char('S') => {
+                self.sort_mode = match self.sort_mode {
+                    SortMode::CreatedNewest => { self.status = "sort: created (oldest)".to_string(); SortMode::CreatedOldest }
+                    SortMode::CreatedOldest => { self.status = "sort: updated".to_string(); SortMode::Updated }
+                    SortMode::Updated => { self.status = "sort: number".to_string(); SortMode::Number }
+                    SortMode::Number => { self.status = "sort: state".to_string(); SortMode::State }
+                    SortMode::State => { self.status = "sort: created (newest)".to_string(); SortMode::CreatedNewest }
+                };
+                self.apply_sort();
+                self.mark_dirty();
             }
             KeyCode::Char('r') => {
                 self.refresh_issues().await?;
@@ -1318,13 +1630,8 @@ impl App {
 
     async fn handle_prs_key(&mut self, key: event::KeyEvent) -> Result<()> {
         match key.code {
-            KeyCode::Char('q') => {
-                self.repo_owner = None;
-                self.repo_name = None;
-                self.repo_path = None;
-                self.status = String::new();
-                self.screen = Screen::Dashboard;
-            }
+            KeyCode::Char('q') => self.go_to_dashboard(),
+            KeyCode::Char('g') => self.go_to_dashboard(),
             KeyCode::Char('Q') => self.should_quit = true,
             KeyCode::Char('j') | KeyCode::Down => {
                 self.prs_view.selected = (self.prs_view.selected + 1)
@@ -1370,6 +1677,13 @@ impl App {
                     self.input_mode = InputMode::Comment {
                         body: String::new(),
                     };
+                }
+            }
+            KeyCode::Char('O') => {
+                if let (Some(owner), Some(repo), Some(ref pr)) = (&self.repo_owner, &self.repo_name, self.selected_pr.clone()) {
+                    let url = format!("https://github.com/{owner}/{repo}/pull/{}", pr.number);
+                    let _ = webbrowser::open(&url);
+                    self.status = format!("opened: {url}");
                 }
             }
             KeyCode::Char('i') => {
@@ -1469,9 +1783,7 @@ impl App {
             KeyCode::Esc => {
                 if let InputMode::BrowseProject { ref mut browser } = self.input_mode {
                     browser.go_up();
-                    if browser.current_dir.parent().is_none()
-                        || browser.current_dir == PathBuf::from("/")
-                    {
+                    if browser.current_dir.parent().is_none() {
                         self.input_mode = InputMode::None;
                     }
                 }
@@ -1487,7 +1799,11 @@ impl App {
     async fn handle_notes_key(&mut self, key: event::KeyEvent) -> Result<()> {
         match key.code {
             KeyCode::Char('q') => {
-                self.screen = Screen::Dashboard;
+                self.go_to_dashboard();
+                self.selected_note = None;
+            }
+            KeyCode::Char('g') => {
+                self.go_to_dashboard();
                 self.selected_note = None;
             }
             KeyCode::Char('Q') => self.should_quit = true,
@@ -1512,6 +1828,22 @@ impl App {
             }
             KeyCode::Char('x') => {
                 self.toggle_note_standalone_state().await?;
+            }
+            KeyCode::Char('E') => {
+                if let Some(note) = self.selected_note.as_ref() {
+                    self.input_mode = InputMode::EditNote {
+                        slug: Some(note.slug.clone()),
+                        title: note.title.clone(),
+                        body: note.body.clone().unwrap_or_default(),
+                        focus: 0,
+                    };
+                    self.status = "editing note (Tab switch, Ctrl+S save, Esc cancel)".to_string();
+                }
+            }
+            KeyCode::Char('/') => {
+                self.input_mode = InputMode::Search {
+                    query: String::new(),
+                };
             }
             KeyCode::Char('d') => {
                 self.delete_standalone_note().await?;
@@ -1687,7 +2019,7 @@ impl App {
 
     async fn toggle_issue_state(&mut self) -> Result<()> {
         let issue_num = self.selected_issue.as_ref().map(|i| i.number);
-        let new_state = if self.selected_issue.as_ref().map_or(false, |i| i.state == "open") { "closed" } else { "open" };
+        let new_state = if self.selected_issue.as_ref().is_some_and(|i| i.state == "open") { "closed" } else { "open" };
 
         // optimistic local update
         if let Some(num) = issue_num {
@@ -1790,6 +2122,22 @@ impl App {
                     self.refresh_project_notes().await?;
                 }
                 Err(e) => self.status = format!("error creating note: {e}"),
+            }
+        } else {
+            self.status = "no project directory".to_string();
+        }
+        Ok(())
+    }
+
+    async fn update_note_local(&mut self, slug: &str, title: &str, body: Option<&str>) -> Result<()> {
+        self.resolve_project_path();
+        if let Some(ref path) = self.repo_path {
+            match notes::update_note(path, slug, title, body, "medium", "open", None) {
+                Ok(_) => {
+                    self.status = format!("updated note: {title}");
+                    self.refresh_project_notes().await?;
+                }
+                Err(e) => self.status = format!("error updating note: {e}"),
             }
         } else {
             self.status = "no project directory".to_string();
@@ -2042,6 +2390,22 @@ impl App {
                 self.prs_view.selected = 0;
                 self.selected_pr = self.prs_view.prs.first().cloned();
             }
+            Screen::Notes => {
+                let filtered: Vec<Note> = self
+                    .project_notes
+                    .iter()
+                    .filter(|n| {
+                        self.search_matcher.fuzzy_match(&n.title, &query).unwrap_or(0) > 0
+                            || n.body.as_ref().is_some_and(|b| {
+                                self.search_matcher.fuzzy_match(b, &query).unwrap_or(0) > 0
+                            })
+                    })
+                    .cloned()
+                    .collect();
+                self.notes_view.notes = filtered;
+                self.notes_view.selected = 0;
+                self.selected_note = self.notes_view.notes.first().cloned();
+            }
             _ => {}
         }
     }
@@ -2057,6 +2421,11 @@ impl App {
             .prs_view
             .selected
             .min(self.prs_view.prs.len().saturating_sub(1));
+        self.notes_view.notes = self.project_notes.clone();
+        self.notes_view.selected = self
+            .notes_view
+            .selected
+            .min(self.notes_view.notes.len().saturating_sub(1));
         self.selected_issue = self
             .issues_view
             .issues
@@ -2121,6 +2490,7 @@ impl App {
             KeyCode::Char('q') | KeyCode::Esc => {
                 self.screen = Screen::Dashboard;
             }
+            KeyCode::Char('g') => self.go_to_dashboard(),
             KeyCode::Char('j') | KeyCode::Down => {
                 self.stats_view.selected = (self.stats_view.selected + 1)
                     .min(self.stats_view.total_items.len().saturating_sub(1));
@@ -2138,6 +2508,7 @@ impl App {
             KeyCode::Char('q') | KeyCode::Esc => {
                 self.screen = Screen::Dashboard;
             }
+            KeyCode::Char('g') => self.go_to_dashboard(),
             KeyCode::Char('j') | KeyCode::Down => {
                 let group_len = self.roadmap_view.groups.get(self.roadmap_view.selected_group).map(|(_, items)| items.len()).unwrap_or(0);
                 self.roadmap_view.selected_item = (self.roadmap_view.selected_item + 1)

@@ -61,6 +61,7 @@ impl IssuesView {
         note_selected: usize,
         focus: FocusTarget,
         editing: Option<&EditState>,
+        detail_scroll: u16,
     ) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
@@ -78,10 +79,10 @@ impl IssuesView {
         if let Some(editing) = editing {
             self.draw_detail_editing(frame, layout[1], editing);
         } else if let Some(issue) = detail_issue {
-            self.draw_detail(frame, layout[1], issue, comments.unwrap_or(&[]));
+            self.draw_detail(frame, layout[1], issue, comments.unwrap_or(&[]), detail_scroll);
         } else if focus == FocusTarget::Notes {
             if let Some(note) = notes.get(note_selected) {
-                self.draw_note_detail(frame, layout[1], note);
+                self.draw_note_detail(frame, layout[1], note, detail_scroll);
             }
         }
     }
@@ -360,7 +361,7 @@ impl IssuesView {
         frame.render_widget(block, area);
     }
 
-    fn draw_detail(&self, frame: &mut Frame, area: Rect, issue: &Issue, comments: &[Comment]) {
+    fn draw_detail(&self, frame: &mut Frame, area: Rect, issue: &Issue, comments: &[Comment], scroll: u16) {
         let block = Block::default()
             .borders(Borders::ALL)
             .title(format!(" Issue #{} ", issue.number))
@@ -439,11 +440,11 @@ impl IssuesView {
             }
         }
 
-        let detail = Paragraph::new(lines).block(block);
+        let detail = Paragraph::new(lines).block(block).scroll((scroll, 0));
         frame.render_widget(detail, area);
     }
 
-    fn draw_note_detail(&self, frame: &mut Frame, area: Rect, note: &Note) {
+    fn draw_note_detail(&self, frame: &mut Frame, area: Rect, note: &Note, scroll: u16) {
         let block = Block::default()
             .borders(Borders::ALL)
             .title(format!(" Note: {} ", note.title))
@@ -491,7 +492,7 @@ impl IssuesView {
             }
         }
 
-        let detail = Paragraph::new(lines).block(block);
+        let detail = Paragraph::new(lines).block(block).scroll((scroll, 0));
         frame.render_widget(detail, area);
     }
 }

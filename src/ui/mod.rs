@@ -15,11 +15,12 @@ use ratatui::Frame;
 
 pub fn keybinds_bar(frame: &mut Frame, area: Rect, screen: &str, input_mode: &str) {
     let binds = match (screen, input_mode) {
-        ("dashboard", _) => " [a]dd project  [d]elete  [s]tats  [t] roadmap  [enter] open  [q]uit",
-        ("issues", "none") => " [c]reate issue  [e]dit  [Tab] focus  [x] toggle  [o] comment  [n]ote  [d]elete note  [L] link note  [f]ilter  [p] PRs  [/] search  [s]tats  [t] roadmap  [r] refresh  [q] back  [Q] quit",
-        ("issues", "edit") => " [Tab] switch field  [Ctrl+S] save  [Esc] cancel",
-        ("prs", "none") => " [c]reate PR  [m]erge  [o] comment  [i] issues  [/] search  [s]tats  [t] roadmap  [r] refresh  [q] back  [Q] quit",
-        ("notes", "none") => " [n]ew note  [enter] open  [d]elete  [q] back  [Q] quit",
+        ("dashboard", _) => " [a]dd  [enter] open  [q]uit  [?] help",
+        ("issues", "none") => " [j/k] nav  [/] search  [Tab] focus  [enter] detail  [?] help  [q] back",
+        ("issues", "edit") => " [Tab] field  [Ctrl+S] save  [Esc] cancel",
+        ("prs", "none") => " [j/k] nav  [enter] detail  [/] search  [?] help  [q] back",
+        ("notes", "none") => " [j/k] nav  [/] search  [?] help  [q] back",
+        ("stats", _) | ("roadmap", _) => " [?] help  [q] back",
         _ => "",
     };
     let style = Style::default()
