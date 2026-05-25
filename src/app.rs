@@ -51,6 +51,7 @@ enum InputMode {
     EditIssue { title: String, body: String, focus: u8, issue_number: u64, labels: Vec<String>, available_labels: Vec<String>, label_idx: usize },
     EditNote { title: String, body: String, focus: u8 },
     LinkNote { input: String },
+    CreateRepo { name: String, private: bool, step: u8 },
 }
 
 pub struct App {
@@ -89,14 +90,19 @@ impl App {
     pub async fn new(config: Config, cache: Cache) -> Result<Self> {
         let client = Client::new(&config);
 
-        let (repo_owner, repo_name, repo_path, status) = match git::detect_current_dir() {
-            Ok(Some(info)) => {
-                let s = format!("{}/{}", info.owner, info.repo);
-                let path = git::project_root();
-                (Some(info.owner), Some(info.repo), path, s)
+        let repo_path = git::project_root();
+        let (repo_owner, repo_name, status) = if let Some(ref path) = repo_path {
+            match git::detect(path) {
+                Ok(Some(info)) => {
+                    let o = info.owner.clone();
+                    let r = info.repo.clone();
+                    (Some(info.owner), Some(info.repo), format!("{o}/{r}"))
+                }
+                Ok(None) => (None, None, "no GitHub remote — press 'c' to create".to_string()),
+                Err(e) => (None, None, format!("{e}")),
             }
-            Ok(None) => (None, None, None, "no git repo detected".to_string()),
-            Err(e) => (None, None, None, format!("{e}")),
+        } else {
+            (None, None, "no git repo detected".to_string())
         };
 
         let projects = config.projects.clone();
@@ -241,6 +247,13 @@ impl App {
             InputMode::LinkNote { input } => {
                 popup::input_dialog(frame, frame.area(), "Link note to issue #", input, "enter to link, esc to cancel");
             }
+            InputMode::CreateRepo { name, private: _, step } => {
+                let (prompt, help) = match step {
+                    0 => ("Repo name", "enter to confirm, esc to cancel"),
+                    _ => ("", ""),
+                };
+                popup::input_dialog(frame, frame.area(), prompt, name, help);
+            }
             InputMode::EditIssue { .. } | InputMode::EditNote { .. } => {}
         }
     }
@@ -320,6 +333,7 @@ impl App {
                 | InputMode::CreateNote { .. }
                 | InputMode::CreatePr { .. }
                 | InputMode::Comment { .. } => self.handle_input_key(key).await?,
+                InputMode::CreateRepo { .. } => self.handle_create_repo_key(key).await?,
                 InputMode::EditIssue { .. } | InputMode::EditNote { .. } => unreachable!(),
             },
         }
@@ -530,7 +544,7 @@ impl App {
                         self.create_pr(&title, Some(&body)).await?;
                     }
                     InputMode::None | InputMode::ConfirmMerge { .. } | InputMode::BrowseProject { .. } => {}
-                    InputMode::LinkNote { .. } | InputMode::EditIssue { .. } | InputMode::EditNote { .. } => unreachable!(),
+                    InputMode::CreateRepo { .. } | InputMode::LinkNote { .. } | InputMode::EditIssue { .. } | InputMode::EditNote { .. } => unreachable!(),
                 }
             }
             KeyCode::Backspace => {
@@ -561,9 +575,11 @@ impl App {
             InputMode::Comment { body } => Some(body),
             InputMode::CreatePr { title, step: 0, .. } => Some(title),
             InputMode::CreatePr { body, step: 1, .. } => Some(body),
+            InputMode::CreateRepo { name, step: 0, .. } => Some(name),
             InputMode::None | InputMode::ConfirmMerge { .. } | InputMode::BrowseProject { .. } => None,
             InputMode::CreateNote { .. } => None,
             InputMode::CreatePr { .. } | InputMode::LinkNote { .. } | InputMode::EditIssue { .. } | InputMode::EditNote { .. } => None,
+            InputMode::CreateRepo { .. } => None,
         }
     }
 
@@ -602,6 +618,18 @@ impl App {
             }
             KeyCode::Char('t') => {
                 self.show_roadmap().await?;
+            }
+            KeyCode::Char('c') => {
+                if self.repo_path.is_some() && self.repo_owner.is_none() {
+                    self.input_mode = InputMode::CreateRepo {
+                        name: self.repo_path.as_ref()
+                            .and_then(|p| p.file_name())
+                            .map(|n| n.to_string_lossy().to_string())
+                            .unwrap_or_default(),
+                        private: false,
+                        step: 0,
+                    };
+                }
             }
             KeyCode::Char('d') => {
                 if !self.dashboard.projects.is_empty() {
@@ -1046,6 +1074,75 @@ impl App {
                 }
             }
             _ => {}
+        }
+        Ok(())
+    }
+
+    async fn handle_create_repo_key(&mut self, key: event::KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Esc => {
+                self.input_mode = InputMode::None;
+                self.status = "canceled".to_string();
+            }
+            KeyCode::Enter => {
+                let mode = std::mem::replace(&mut self.input_mode, InputMode::None);
+                if let InputMode::CreateRepo { name, private, .. } = mode {
+                    if name.trim().is_empty() {
+                        self.status = "name cannot be empty".to_string();
+                        self.input_mode = InputMode::CreateRepo { name, private, step: 0 };
+                        return Ok(());
+                    }
+                    self.create_github_repo(&name, private).await?;
+                }
+            }
+            KeyCode::Backspace => {
+                if let InputMode::CreateRepo { ref mut name, .. } = self.input_mode {
+                    name.pop();
+                }
+            }
+            KeyCode::Char(c) => {
+                if let InputMode::CreateRepo { ref mut name, .. } = self.input_mode {
+                    name.push(c);
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    async fn create_github_repo(&mut self, name: &str, private: bool) -> Result<()> {
+        self.status = format!("creating repo {name}...");
+        match self.client.create_repo(name, private, Some("created from vex")).await {
+            Ok(repo) => {
+                let full_name = repo["full_name"].as_str().unwrap_or(name);
+                let _html_url = repo["html_url"].as_str().unwrap_or("");
+                self.status = format!("created {full_name}");
+
+                if let Some(ref path) = self.repo_path.clone() {
+                    let origin = format!("https://github.com/{full_name}.git");
+                    let _ = std::process::Command::new("git")
+                        .args(["remote", "add", "origin", &origin])
+                        .current_dir(path)
+                        .output();
+                    let _ = std::process::Command::new("git")
+                        .args(["push", "-u", "origin", "HEAD"])
+                        .current_dir(path)
+                        .output();
+                    let _ = std::process::Command::new("git")
+                        .args(["fetch", "origin"])
+                        .current_dir(path)
+                        .output();
+                }
+
+                self.repo_owner = repo["owner"]["login"].as_str().map(|s| s.to_string());
+                self.repo_name = repo["name"].as_str().map(|s| s.to_string());
+                if self.repo_owner.is_some() && self.repo_name.is_some() {
+                    self.switch_to_issues().await?;
+                }
+            }
+            Err(e) => {
+                self.status = format!("error creating repo: {e}");
+            }
         }
         Ok(())
     }

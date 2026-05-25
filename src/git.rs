@@ -72,6 +72,10 @@ fn find_git_dir(path: &Path) -> Option<PathBuf> {
 
 use std::path::PathBuf;
 
+pub fn has_git(path: &Path) -> bool {
+    find_git_dir(path).is_some()
+}
+
 fn parse_remote(content: &str) -> Result<Option<RepoInfo>> {
     for line in content.lines() {
         let line = line.trim();

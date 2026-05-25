@@ -464,6 +464,38 @@ impl Client {
         })
     }
 
+    pub async fn create_repo(
+        &self,
+        name: &str,
+        private: bool,
+        description: Option<&str>,
+    ) -> Result<serde_json::Value> {
+        #[derive(serde::Serialize)]
+        struct CreateRepo {
+            name: String,
+            private: bool,
+            description: Option<String>,
+        }
+
+        let body = self
+            .http
+            .post("https://api.github.com/user/repos")
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Accept", "application/vnd.github.v3+json")
+            .json(&CreateRepo {
+                name: name.to_string(),
+                private,
+                description: description.map(|s| s.to_string()),
+            })
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+
+        Ok(body)
+    }
+
     pub async fn list_labels(&self, owner: &str, repo: &str) -> Result<Vec<String>> {
         #[derive(Deserialize)]
         struct GhLabel {
