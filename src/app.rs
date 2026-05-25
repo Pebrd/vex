@@ -12,7 +12,7 @@ use crate::ui::roadmap::RoadmapView;
 use crate::ui::stats::StatsView;
 use crate::ui::{popup, status_bar};
 use anyhow::Result;
-use crossterm::event::{self, Event, KeyCode, KeyModifiers};
+use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use fuzzy_matcher::FuzzyMatcher;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
@@ -309,7 +309,313 @@ impl App {
         if event::poll(Duration::from_millis(100))? {
             match event::read()? {
                 Event::Key(key) => self.handle_key(key).await?,
+                Event::Mouse(mouse) => self.handle_mouse(mouse).await?,
                 _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn screen_area(&self) -> Result<Rect> {
+        let (cols, rows) = crossterm::terminal::size()?;
+        Ok(Rect::new(0, 0, cols, rows.saturating_sub(2)))
+    }
+
+    async fn handle_mouse(&mut self, mouse: MouseEvent) -> Result<()> {
+        if !self.config.mouse_enabled {
+            return Ok(());
+        }
+        match mouse.kind {
+            MouseEventKind::Down(MouseButton::Left) => {
+                if !matches!(self.input_mode, InputMode::None) {
+                    return Ok(());
+                }
+                match self.screen {
+                    Screen::Dashboard => self.mouse_click_dashboard(mouse.column, mouse.row).await?,
+                    Screen::Issues => self.mouse_click_issues(mouse.column, mouse.row).await?,
+                    Screen::PullRequests => self.mouse_click_prs(mouse.column, mouse.row).await?,
+                    Screen::Notes => self.mouse_click_notes(mouse.column, mouse.row).await?,
+                    Screen::Stats => self.mouse_click_stats(mouse.column, mouse.row),
+                    Screen::Roadmap => self.mouse_click_roadmap(mouse.column, mouse.row),
+                }
+            }
+            MouseEventKind::ScrollUp => {
+                self.mouse_scroll_up().await?;
+            }
+            MouseEventKind::ScrollDown => {
+                self.mouse_scroll_down().await?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn item_at_row(&self, area: Rect, row: u16) -> Option<usize> {
+        let inner_y = area.y + 1;
+        if row < inner_y {
+            return None;
+        }
+        let idx = (row - inner_y) as usize;
+        if row >= area.y + area.height - 1 {
+            return None;
+        }
+        Some(idx)
+    }
+
+    async fn mouse_click_dashboard(&mut self, _col: u16, row: u16) -> Result<()> {
+        if self.dashboard.projects.is_empty() {
+            return Ok(());
+        }
+        let area = self.screen_area()?;
+        let Some(idx) = self.item_at_row(area, row) else { return Ok(()) };
+        if idx >= self.dashboard.projects.len() {
+            return Ok(());
+        }
+        self.dashboard.selected = idx;
+        if let Some(project) = self.dashboard.projects.get(self.dashboard.selected) {
+            self.repo_owner = Some(project.owner.clone());
+            self.repo_name = Some(project.repo.clone());
+            self.repo_path = git::project_root_for(std::path::Path::new(&project.path));
+            self.stats_view = StatsView::new(&project.owner, &project.repo);
+            self.roadmap_view = RoadmapView::new(&project.owner, &project.repo);
+            self.status = format!("{}/{}", project.owner, project.repo);
+            self.switch_to_issues().await?;
+        }
+        Ok(())
+    }
+
+    async fn mouse_click_issues(&mut self, col: u16, row: u16) -> Result<()> {
+        let area = self.screen_area()?;
+        let layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Ratio(2, 5), Constraint::Ratio(3, 5)])
+            .split(area);
+        let left_panels = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+            .split(layout[0]);
+
+        // Issues list (top-left)
+        if col >= left_panels[0].x && col < left_panels[0].x + left_panels[0].width
+            && row >= left_panels[0].y && row < left_panels[0].y + left_panels[0].height
+        {
+            if let Some(idx) = self.item_at_row(left_panels[0], row) {
+                if idx < self.issues_view.issues.len() {
+                    self.focus = FocusTarget::Issues;
+                    self.detail_target = DetailTarget::Issue;
+                    self.issues_view.selected = idx;
+                    self.selected_issue = self.issues_view.issues.get(idx).cloned();
+                    if let Some(ref issue) = self.selected_issue {
+                        if !self.issue_comments.contains_key(&issue.number) {
+                            self.load_issue_comments(issue.number).await?;
+                        }
+                    }
+                }
+            }
+            return Ok(());
+        }
+
+        // Notes list (bottom-left)
+        if col >= left_panels[1].x && col < left_panels[1].x + left_panels[1].width
+            && row >= left_panels[1].y && row < left_panels[1].y + left_panels[1].height
+        {
+            if let Some(idx) = self.item_at_row(left_panels[1], row) {
+                if idx < self.project_notes.len() {
+                    self.focus = FocusTarget::Notes;
+                    self.detail_target = DetailTarget::Note;
+                    self.selected_note_idx = idx;
+                }
+            }
+            return Ok(());
+        }
+
+        // Detail panel (right side) — like pressing Enter
+        if col >= layout[1].x && col < layout[1].x + layout[1].width
+            && row >= layout[1].y && row < layout[1].y + layout[1].height
+        {
+            match self.focus {
+                FocusTarget::Issues => {
+                    self.selected_issue = self.issues_view.issues.get(self.issues_view.selected).cloned();
+                    self.detail_target = DetailTarget::Issue;
+                    if let Some(ref issue) = self.selected_issue {
+                        if !self.issue_comments.contains_key(&issue.number) {
+                            self.load_issue_comments(issue.number).await?;
+                        }
+                    }
+                }
+                FocusTarget::Notes => {
+                    self.detail_target = DetailTarget::Note;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn mouse_click_prs(&mut self, _col: u16, row: u16) -> Result<()> {
+        let area = self.screen_area()?;
+        let layout = if self.selected_pr.is_some() {
+            Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Ratio(2, 5), Constraint::Ratio(3, 5)])
+                .split(area)
+        } else {
+            Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Min(1), Constraint::Length(0)])
+                .split(area)
+        };
+        if let Some(idx) = self.item_at_row(layout[0], row) {
+            if idx < self.prs_view.prs.len() {
+                self.prs_view.selected = idx;
+                self.selected_pr = self.prs_view.prs.get(idx).cloned();
+                if let Some(ref pr) = self.selected_pr {
+                    if !self.pr_comments.contains_key(&pr.number) {
+                        self.load_pr_comments(pr.number).await?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn mouse_click_notes(&mut self, _col: u16, row: u16) -> Result<()> {
+        let area = self.screen_area()?;
+        let layout = if self.selected_note.is_some() {
+            Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Ratio(2, 5), Constraint::Ratio(3, 5)])
+                .split(area)
+        } else {
+            Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Min(1), Constraint::Length(0)])
+                .split(area)
+        };
+        if let Some(idx) = self.item_at_row(layout[0], row) {
+            if idx < self.notes_view.notes.len() {
+                self.notes_view.selected = idx;
+                self.selected_note = self.notes_view.notes.get(idx).cloned();
+            }
+        }
+        Ok(())
+    }
+
+    fn mouse_click_stats(&mut self, _col: u16, row: u16) {
+        let area = match self.screen_area() {
+            Ok(a) => a,
+            _ => return,
+        };
+        let title_row = area.y;  // title takes 1 line at top
+        if row <= title_row {
+            return;
+        }
+        let idx = (row - title_row - 1) as usize;
+        if idx < self.stats_view.total_items.len() {
+            self.stats_view.selected = idx;
+        }
+    }
+
+    fn mouse_click_roadmap(&mut self, col: u16, row: u16) {
+        let area = match self.screen_area() {
+            Ok(a) => a,
+            _ => return,
+        };
+        if self.roadmap_view.groups.is_empty() {
+            return;
+        }
+        let title_height = 1u16; // title paragraph at top
+        let list_area_y = area.y + title_height;
+        if row < list_area_y {
+            return;
+        }
+        let n = self.roadmap_view.groups.len() as u16;
+        let col_width = area.width / n;
+        let group_idx = ((col - area.x) / col_width) as usize;
+        if group_idx >= self.roadmap_view.groups.len() {
+            return;
+        }
+        self.roadmap_view.selected_group = group_idx;
+        let row_idx = (row - list_area_y) as usize;
+        let max = self.roadmap_view.groups[group_idx].1.len().saturating_sub(1);
+        self.roadmap_view.selected_item = row_idx.min(max);
+    }
+
+    async fn mouse_scroll_up(&mut self) -> Result<()> {
+        match self.screen {
+            Screen::Dashboard => {
+                self.dashboard.selected = self.dashboard.selected.saturating_sub(1);
+            }
+            Screen::Issues => {
+                match self.focus {
+                    FocusTarget::Issues => {
+                        self.issues_view.selected = self.issues_view.selected.saturating_sub(1);
+                        self.selected_issue = self.issues_view.issues.get(self.issues_view.selected).cloned();
+                        self.detail_target = DetailTarget::Issue;
+                    }
+                    FocusTarget::Notes => {
+                        self.selected_note_idx = self.selected_note_idx.saturating_sub(1);
+                        self.detail_target = DetailTarget::Note;
+                    }
+                }
+            }
+            Screen::PullRequests => {
+                self.prs_view.selected = self.prs_view.selected.saturating_sub(1);
+                self.selected_pr = self.prs_view.prs.get(self.prs_view.selected).cloned();
+            }
+            Screen::Notes => {
+                self.notes_view.selected = self.notes_view.selected.saturating_sub(1);
+                self.selected_note = self.notes_view.notes.get(self.notes_view.selected).cloned();
+            }
+            Screen::Stats => {
+                self.stats_view.selected = self.stats_view.selected.saturating_sub(1);
+            }
+            Screen::Roadmap => {
+                let group_len = self.roadmap_view.groups.get(self.roadmap_view.selected_group).map(|(_, items)| items.len()).unwrap_or(0);
+                self.roadmap_view.selected_item = self.roadmap_view.selected_item.saturating_sub(1).min(group_len.saturating_sub(1));
+            }
+        }
+        Ok(())
+    }
+
+    async fn mouse_scroll_down(&mut self) -> Result<()> {
+        match self.screen {
+            Screen::Dashboard => {
+                self.dashboard.selected = (self.dashboard.selected + 1)
+                    .min(self.dashboard.projects.len().saturating_sub(1));
+            }
+            Screen::Issues => {
+                match self.focus {
+                    FocusTarget::Issues => {
+                        self.issues_view.selected = (self.issues_view.selected + 1)
+                            .min(self.issues_view.issues.len().saturating_sub(1));
+                        self.selected_issue = self.issues_view.issues.get(self.issues_view.selected).cloned();
+                        self.detail_target = DetailTarget::Issue;
+                    }
+                    FocusTarget::Notes => {
+                        self.selected_note_idx = (self.selected_note_idx + 1)
+                            .min(self.project_notes.len().saturating_sub(1));
+                        self.detail_target = DetailTarget::Note;
+                    }
+                }
+            }
+            Screen::PullRequests => {
+                self.prs_view.selected = (self.prs_view.selected + 1)
+                    .min(self.prs_view.prs.len().saturating_sub(1));
+                self.selected_pr = self.prs_view.prs.get(self.prs_view.selected).cloned();
+            }
+            Screen::Notes => {
+                self.notes_view.selected = (self.notes_view.selected + 1)
+                    .min(self.notes_view.notes.len().saturating_sub(1));
+                self.selected_note = self.notes_view.notes.get(self.notes_view.selected).cloned();
+            }
+            Screen::Stats => {
+                self.stats_view.selected = (self.stats_view.selected + 1)
+                    .min(self.stats_view.total_items.len().saturating_sub(1));
+            }
+            Screen::Roadmap => {
+                let group_len = self.roadmap_view.groups.get(self.roadmap_view.selected_group).map(|(_, items)| items.len()).unwrap_or(0);
+                self.roadmap_view.selected_item = (self.roadmap_view.selected_item + 1)
+                    .min(group_len.saturating_sub(1));
             }
         }
         Ok(())

@@ -6,7 +6,11 @@ use std::path::PathBuf;
 pub struct Config {
     pub token: String,
     pub projects: Vec<Project>,
+    #[serde(default = "default_true")]
+    pub mouse_enabled: bool,
 }
+
+fn default_true() -> bool { true }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
@@ -21,6 +25,7 @@ impl Default for Config {
         Self {
             token: String::new(),
             projects: Vec::new(),
+            mouse_enabled: true,
         }
     }
 }
