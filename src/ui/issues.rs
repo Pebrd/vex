@@ -9,7 +9,9 @@ use ratatui::Frame;
 pub struct IssuesView {
     pub issues: Vec<Issue>,
     pub selected: usize,
+    #[allow(dead_code)]
     pub filter_state: Option<String>,
+    #[allow(dead_code)]
     pub filter_label: Option<String>,
 }
 

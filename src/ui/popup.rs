@@ -32,6 +32,7 @@ pub fn input_dialog(frame: &mut Frame, area: Rect, title: &str, value: &str, hel
     let _ = frame.set_cursor_position((cursor_x.min(inner.right().saturating_sub(1)), cursor_y));
 }
 
+#[allow(dead_code)]
 pub fn confirm_dialog(frame: &mut Frame, area: Rect, title: &str, message: &str) {
     let popup = crate::ui::centered_rect(50, 20, area);
     frame.render_widget(Clear, popup);

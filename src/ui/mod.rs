@@ -74,7 +74,8 @@ pub fn centered_rect(percent_x: u16, percent_y: u16, within: Rect) -> Rect {
         .split(popup_layout[1])[1]
 }
 
-pub fn title_block(title: &str) -> Block {
+#[allow(dead_code)]
+pub fn title_block(title: &str) -> Block<'_> {
     Block::default()
         .borders(Borders::ALL)
         .title(format!(" {title} "))

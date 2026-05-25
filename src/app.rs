@@ -56,6 +56,7 @@ enum InputMode {
 
 pub struct App {
     config: Config,
+    #[allow(dead_code)]
     cache: Cache,
     client: Client,
     screen: Screen,

@@ -6,6 +6,7 @@ use std::sync::Mutex;
 
 pub struct Cache {
     conn: Mutex<Connection>,
+    #[allow(dead_code)]
     path: PathBuf,
 }
 
@@ -83,6 +84,7 @@ impl Cache {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn path(&self) -> &PathBuf {
         &self.path
     }

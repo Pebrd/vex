@@ -205,6 +205,7 @@ pub fn delete_note(project_dir: &Path, slug: &str) -> Result<()> {
     Ok(())
 }
 
+#[allow(dead_code)]
 pub fn get_note(project_dir: &Path, slug: &str) -> Result<Option<Note>> {
     let path = notes_dir(project_dir).join(format!("{slug}.md"));
     if path.exists() {

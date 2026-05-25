@@ -7,6 +7,7 @@ pub struct RepoInfo {
     pub repo: String,
 }
 
+#[allow(dead_code)]
 pub fn detect_current_dir() -> Result<Option<RepoInfo>> {
     let cwd = std::env::current_dir()?;
     detect(&cwd)
@@ -72,6 +73,7 @@ fn find_git_dir(path: &Path) -> Option<PathBuf> {
 
 use std::path::PathBuf;
 
+#[allow(dead_code)]
 pub fn has_git(path: &Path) -> bool {
     find_git_dir(path).is_some()
 }

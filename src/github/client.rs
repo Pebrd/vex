@@ -57,6 +57,7 @@ struct GhLabel {
 
 #[derive(Deserialize)]
 struct GhBranch {
+    #[allow(dead_code)]
     label: String,
     r#ref: String,
 }

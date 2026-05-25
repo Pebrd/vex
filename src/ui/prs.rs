@@ -8,6 +8,7 @@ use ratatui::Frame;
 pub struct PRsView {
     pub prs: Vec<PullRequest>,
     pub selected: usize,
+    #[allow(dead_code)]
     pub filter_state: Option<String>,
 }
 
