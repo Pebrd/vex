@@ -8,14 +8,17 @@ use ratatui::Frame;
 pub struct Dashboard {
     pub projects: Vec<Project>,
     pub selected: usize,
+    list_state: ListState,
 }
 
 impl Dashboard {
     pub fn new(projects: Vec<Project>) -> Self {
-        Self { projects, selected: 0 }
+        let mut list_state = ListState::default();
+        list_state.select(Some(0));
+        Self { projects, selected: 0, list_state }
     }
 
-    pub fn draw(&self, frame: &mut Frame, area: Rect) {
+    pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
         if self.projects.is_empty() {
             let block = Block::default()
                 .borders(Borders::ALL)
@@ -83,14 +86,13 @@ impl Dashboard {
             })
             .collect();
 
-        let mut list_state = ListState::default();
-        list_state.select(Some(self.selected));
+        self.list_state.select(Some(self.selected));
 
         let list = List::new(items)
             .highlight_style(Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD))
             .highlight_symbol("> ");
 
         frame.render_widget(block, area);
-        frame.render_stateful_widget(list, inner, &mut list_state);
+        frame.render_stateful_widget(list, inner, &mut self.list_state);
     }
 }

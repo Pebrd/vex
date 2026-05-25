@@ -2,7 +2,7 @@ use crate::github::{Issue, PullRequest};
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph};
+use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
 use ratatui::Frame;
 
 pub struct StatsView {
@@ -10,15 +10,19 @@ pub struct StatsView {
     pub repo: String,
     pub total_items: Vec<String>,
     pub selected: usize,
+    list_state: ListState,
 }
 
 impl StatsView {
     pub fn new(owner: &str, repo: &str) -> Self {
+        let mut list_state = ListState::default();
+        list_state.select(Some(0));
         Self {
             owner: owner.to_string(),
             repo: repo.to_string(),
             total_items: Vec::new(),
             selected: 0,
+            list_state,
         }
     }
 
@@ -41,7 +45,7 @@ impl StatsView {
         ];
     }
 
-    pub fn draw(&self, frame: &mut Frame, area: Rect) {
+    pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
         let title = Paragraph::new(Line::from(vec![
             Span::styled(
                 format!(" {}/{} — Statistics ", self.owner, self.repo),
@@ -79,8 +83,7 @@ impl StatsView {
             .highlight_style(Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD))
             .highlight_symbol("> ");
 
-        let mut state = ratatui::widgets::ListState::default();
-        state.select(Some(self.selected));
-        frame.render_stateful_widget(list, inner, &mut state);
+        self.list_state.select(Some(self.selected));
+        frame.render_stateful_widget(list, inner, &mut self.list_state);
     }
 }

@@ -8,14 +8,17 @@ use ratatui::Frame;
 pub struct NotesView {
     pub notes: Vec<Note>,
     pub selected: usize,
+    list_state: ListState,
 }
 
 impl NotesView {
     pub fn new(notes: Vec<Note>) -> Self {
-        Self { notes, selected: 0 }
+        let mut list_state = ListState::default();
+        list_state.select(Some(0));
+        Self { notes, selected: 0, list_state }
     }
 
-    pub fn draw(&self, frame: &mut Frame, area: Rect, detail: Option<&Note>) {
+    pub fn draw(&mut self, frame: &mut Frame, area: Rect, detail: Option<&Note>) {
         let layout = if detail.is_some() {
             Layout::default()
                 .direction(Direction::Horizontal)
@@ -72,8 +75,7 @@ impl NotesView {
             })
             .collect();
 
-        let mut list_state = ListState::default();
-        list_state.select(Some(self.selected));
+        self.list_state.select(Some(self.selected));
 
         let list = List::new(items)
             .highlight_style(
@@ -83,14 +85,14 @@ impl NotesView {
             )
             .highlight_symbol("> ");
 
-        frame.render_stateful_widget(list, inner, &mut list_state);
+        frame.render_stateful_widget(list, inner, &mut self.list_state);
 
         if let Some(note) = detail {
             self.draw_detail(frame, layout[1], note);
         }
     }
 
-    fn draw_detail(&self, frame: &mut Frame, area: Rect, note: &Note) {
+    fn draw_detail(&mut self, frame: &mut Frame, area: Rect, note: &Note) {
         let block = Block::default()
             .borders(Borders::ALL)
             .title(format!(" Note: {} ", note.title))

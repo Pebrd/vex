@@ -13,6 +13,8 @@ pub struct IssuesView {
     pub filter_state: Option<String>,
     #[allow(dead_code)]
     pub filter_label: Option<String>,
+    list_state: ListState,
+    notes_list_state: ListState,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -35,16 +37,22 @@ pub struct EditState {
 
 impl IssuesView {
     pub fn new(issues: Vec<Issue>) -> Self {
+        let mut list_state = ListState::default();
+        list_state.select(Some(0));
+        let mut notes_list_state = ListState::default();
+        notes_list_state.select(Some(0));
         Self {
             issues,
             selected: 0,
             filter_state: None,
             filter_label: None,
+            list_state,
+            notes_list_state,
         }
     }
 
     pub fn draw(
-        &self,
+        &mut self,
         frame: &mut Frame,
         area: Rect,
         detail_issue: Option<&Issue>,
@@ -78,7 +86,7 @@ impl IssuesView {
         }
     }
 
-    fn draw_issues_list(&self, frame: &mut Frame, area: Rect, is_active: bool) {
+    fn draw_issues_list(&mut self, frame: &mut Frame, area: Rect, is_active: bool) {
         let border_style = if is_active {
             Style::default().fg(Color::Cyan)
         } else {
@@ -131,8 +139,7 @@ impl IssuesView {
             })
             .collect();
 
-        let mut list_state = ListState::default();
-        list_state.select(Some(self.selected));
+        self.list_state.select(Some(self.selected));
 
         let highlight = if is_active {
             Style::default()
@@ -146,10 +153,10 @@ impl IssuesView {
             .highlight_style(highlight)
             .highlight_symbol(if is_active { "> " } else { "  " });
 
-        frame.render_stateful_widget(list, inner, &mut list_state);
+        frame.render_stateful_widget(list, inner, &mut self.list_state);
     }
 
-    fn draw_notes_list(&self, frame: &mut Frame, area: Rect, notes: &[Note], selected: usize, is_active: bool) {
+    fn draw_notes_list(&mut self, frame: &mut Frame, area: Rect, notes: &[Note], selected: usize, is_active: bool) {
         let border_style = if is_active {
             Style::default().fg(Color::Cyan)
         } else {
@@ -198,8 +205,7 @@ impl IssuesView {
             })
             .collect();
 
-        let mut list_state = ListState::default();
-        list_state.select(Some(selected));
+        self.notes_list_state.select(Some(selected));
 
         let highlight = if is_active {
             Style::default()
@@ -213,7 +219,7 @@ impl IssuesView {
             .highlight_style(highlight)
             .highlight_symbol(if is_active { "> " } else { "  " });
 
-        frame.render_stateful_widget(list, inner, &mut list_state);
+        frame.render_stateful_widget(list, inner, &mut self.notes_list_state);
     }
 
     fn draw_detail_editing(&self, frame: &mut Frame, area: Rect, editing: &EditState) {

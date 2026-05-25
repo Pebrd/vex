@@ -13,16 +13,20 @@ use crate::ui::stats::StatsView;
 use crate::ui::{popup, status_bar};
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::widgets::Clear;
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::widgets::{Clear, Paragraph};
 use ratatui::Frame;
 use ratatui::Terminal;
 use std::collections::HashMap;
 use std::io::Stdout;
 use std::path::PathBuf;
-use std::time::Duration;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::sync::mpsc;
 
 #[derive(PartialEq)]
 enum Screen {
@@ -38,6 +42,15 @@ enum Screen {
 enum DetailTarget {
     Issue,
     Note,
+}
+
+enum BgEvent {
+    IssuesReady(Vec<Issue>),
+    PRsReady(Vec<PullRequest>),
+    CommentsReady(u64, Vec<Comment>),
+    #[allow(dead_code)]
+    LabelsReady(Vec<String>),
+    Error(String),
 }
 
 enum InputMode {
@@ -58,7 +71,9 @@ pub struct App {
     config: Config,
     #[allow(dead_code)]
     cache: Cache,
-    client: Client,
+    client: Arc<Client>,
+    cmd_tx: mpsc::UnboundedSender<BgEvent>,
+    cmd_rx: mpsc::UnboundedReceiver<BgEvent>,
     screen: Screen,
     input_mode: InputMode,
     dashboard: Dashboard,
@@ -80,16 +95,20 @@ pub struct App {
     stats_view: StatsView,
     roadmap_view: RoadmapView,
     should_quit: bool,
+    needs_redraw: bool,
     project_notes: Vec<Note>,
     selected_note_idx: usize,
     focus: FocusTarget,
     detail_target: DetailTarget,
     state_filter: String,
+    search_matcher: SkimMatcherV2,
+    last_search_press: Option<Instant>,
 }
 
 impl App {
     pub async fn new(config: Config, cache: Cache) -> Result<Self> {
-        let client = Client::new(&config);
+        let client = Arc::new(Client::new(&config));
+        let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
         let repo_path = git::project_root();
         let (repo_owner, repo_name, status) = if let Some(ref path) = repo_path {
@@ -125,6 +144,8 @@ impl App {
             config,
             cache,
             client,
+            cmd_tx,
+            cmd_rx,
             screen: Screen::Dashboard,
             input_mode: InputMode::None,
             dashboard,
@@ -144,6 +165,7 @@ impl App {
             status,
             loading: false,
             should_quit: false,
+            needs_redraw: true,
             stats_view: StatsView::new(&owner_str, &repo_str),
             roadmap_view: RoadmapView::new(&owner_str, &repo_str),
             project_notes,
@@ -151,6 +173,8 @@ impl App {
             focus: FocusTarget::Issues,
             detail_target: DetailTarget::Issue,
             state_filter: "open".to_string(),
+            search_matcher: SkimMatcherV2::default(),
+            last_search_press: None,
         };
 
         if app.repo_owner.is_some() && app.repo_name.is_some() {
@@ -162,19 +186,96 @@ impl App {
 
     pub async fn run(&mut self, terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result<()> {
         while !self.should_quit {
-            terminal.draw(|frame| self.draw(frame))?;
+            if self.needs_redraw {
+                terminal.draw(|frame| self.draw(frame))?;
+                self.needs_redraw = false;
+            }
+            self.drain_bg_events();
             self.handle_events().await?;
         }
         Ok(())
     }
 
-    fn draw(&self, frame: &mut Frame) {
+    fn mark_dirty(&mut self) {
+        self.needs_redraw = true;
+    }
+
+    fn drain_bg_events(&mut self) {
+        while let Ok(event) = self.cmd_rx.try_recv() {
+            match event {
+                BgEvent::IssuesReady(issues) => {
+                    self.all_issues = issues;
+                    let count = self.all_issues.len();
+                    if !matches!(&self.input_mode, InputMode::Search { .. }) {
+                        self.issues_view = IssuesView::new(self.all_issues.clone());
+                    }
+                    if let Some(ref owner) = self.repo_owner {
+                        if let Some(ref repo) = self.repo_name {
+                            self.status = format!("{owner}/{repo} — {count} issues ({})", self.state_filter);
+                        }
+                    }
+                    self.loading = false;
+                    self.mark_dirty();
+                }
+                BgEvent::PRsReady(prs) => {
+                    self.all_prs = prs;
+                    let count = self.all_prs.len();
+                    if !matches!(&self.input_mode, InputMode::Search { .. }) {
+                        self.prs_view = PRsView::new(self.all_prs.clone());
+                    }
+                    if let Some(ref owner) = self.repo_owner {
+                        if let Some(ref repo) = self.repo_name {
+                            if self.screen == Screen::PullRequests {
+                                self.status = format!("{owner}/{repo} — {count} PRs");
+                            }
+                        }
+                    }
+                    self.loading = false;
+                    self.mark_dirty();
+                }
+                BgEvent::CommentsReady(number, comments) => {
+                    self.issue_comments.insert(number, comments);
+                    self.mark_dirty();
+                }
+                BgEvent::LabelsReady(labels) => {
+                    let labels_for_edit = labels;
+                    if self.repo_owner.is_some() && self.repo_name.is_some() {
+                        self.input_mode = InputMode::EditIssue {
+                            title: String::new(),
+                            body: String::new(),
+                            focus: 0,
+                            issue_number: 0,
+                            labels: Vec::new(),
+                            available_labels: labels_for_edit,
+                            label_idx: 0,
+                        };
+                    }
+                    self.status = "creating issue (Tab switch field, Ctrl+S save)".to_string();
+                    self.mark_dirty();
+                }
+                BgEvent::Error(e) => {
+                    self.status = e;
+                    self.loading = false;
+                    self.mark_dirty();
+                }
+            }
+        }
+    }
+
+    fn draw(&mut self, frame: &mut Frame) {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(1), Constraint::Length(1), Constraint::Length(1)])
             .split(frame.area());
 
         frame.render_widget(Clear, layout[0]);
+
+        if self.loading {
+            let spinner = Paragraph::new(" Loading... ")
+                .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
+            frame.render_widget(spinner, layout[0]);
+            return;
+        }
 
         match self.screen {
             Screen::Dashboard => self.dashboard.draw(frame, layout[0]),
@@ -259,7 +360,7 @@ impl App {
         }
     }
 
-    fn draw_issues(&self, frame: &mut Frame, area: Rect) {
+    fn draw_issues(&mut self, frame: &mut Frame, area: Rect) {
         let editing = match &self.input_mode {
             InputMode::EditIssue { title, body, focus, issue_number, labels, available_labels, label_idx } => {
                 Some(crate::ui::issues::EditState {
@@ -305,12 +406,78 @@ impl App {
         );
     }
 
+    fn spawn_load_issues(&self) {
+        if let (Some(owner), Some(repo)) = (self.repo_owner.clone(), self.repo_name.clone()) {
+            let filter = if self.state_filter == "all" { None } else { Some(self.state_filter.clone()) };
+            let tx = self.cmd_tx.clone();
+            let client = self.client.clone();
+            tokio::spawn(async move {
+                match client.list_issues(&owner, &repo, filter.as_deref()).await {
+                    Ok(issues) => { let _ = tx.send(BgEvent::IssuesReady(issues)); }
+                    Err(e) => { let _ = tx.send(BgEvent::Error(format!("{e}"))); }
+                }
+            });
+        }
+    }
+
+    fn spawn_load_prs(&self) {
+        if let (Some(owner), Some(repo)) = (self.repo_owner.clone(), self.repo_name.clone()) {
+            let tx = self.cmd_tx.clone();
+            let client = self.client.clone();
+            tokio::spawn(async move {
+                match client.list_pull_requests(&owner, &repo, Some("open")).await {
+                    Ok(prs) => { let _ = tx.send(BgEvent::PRsReady(prs)); }
+                    Err(e) => { let _ = tx.send(BgEvent::Error(format!("{e}"))); }
+                }
+            });
+        }
+    }
+
+    fn spawn_load_comments(&self, number: u64) {
+        if let (Some(owner), Some(repo)) = (self.repo_owner.clone(), self.repo_name.clone()) {
+            let tx = self.cmd_tx.clone();
+            let client = self.client.clone();
+            tokio::spawn(async move {
+                match client.list_comments(&owner, &repo, number).await {
+                    Ok(comments) => { let _ = tx.send(BgEvent::CommentsReady(number, comments)); }
+                    Err(e) => { let _ = tx.send(BgEvent::Error(format!("{e}"))); }
+                }
+            });
+        }
+    }
+
+    #[allow(dead_code)]
+    fn spawn_load_labels(&self) {
+        if let (Some(owner), Some(repo)) = (self.repo_owner.clone(), self.repo_name.clone()) {
+            let tx = self.cmd_tx.clone();
+            let client = self.client.clone();
+            tokio::spawn(async move {
+                match client.list_labels(&owner, &repo).await {
+                    Ok(labels) => { let _ = tx.send(BgEvent::LabelsReady(labels)); }
+                    Err(e) => { let _ = tx.send(BgEvent::Error(format!("{e}"))); }
+                }
+            });
+        }
+    }
+
     async fn handle_events(&mut self) -> Result<()> {
-        if event::poll(Duration::from_millis(100))? {
+        if event::poll(Duration::from_millis(16))? {
             match event::read()? {
-                Event::Key(key) => self.handle_key(key).await?,
-                Event::Mouse(mouse) => self.handle_mouse(mouse).await?,
+                Event::Key(key) => { self.handle_key(key).await?; }
+                Event::Mouse(mouse) => { self.handle_mouse(mouse).await?; }
+                Event::Resize(_, _) => {}
                 _ => {}
+            }
+            self.mark_dirty();
+
+            // debounced search: apply filter only after 80ms idle
+            if matches!(&self.input_mode, InputMode::Search { .. }) {
+                if let Some(t) = self.last_search_press {
+                    if t.elapsed() >= Duration::from_millis(80) {
+                        self.apply_search_filter();
+                        self.last_search_press = None;
+                    }
+                }
             }
         }
         Ok(())
@@ -807,12 +974,14 @@ impl App {
             KeyCode::Esc => {
                 let was_search = matches!(self.input_mode, InputMode::Search { .. });
                 self.input_mode = InputMode::None;
+                self.last_search_press = None;
                 if was_search {
                     self.restore_filter();
                 }
             }
             KeyCode::Enter => {
                 let mode = std::mem::replace(&mut self.input_mode, InputMode::None);
+                self.last_search_press = None;
                 match mode {
                     InputMode::Search { query } => {
                         self.status = format!("filtered: \"{query}\"");
@@ -868,7 +1037,7 @@ impl App {
         }
 
         if matches!(&self.input_mode, InputMode::Search { .. }) {
-            self.apply_search_filter();
+            self.last_search_press = Some(Instant::now());
         }
 
         Ok(())
@@ -1579,26 +1748,12 @@ impl App {
     }
 
     async fn load_issue_comments(&mut self, number: u64) -> Result<()> {
-        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
-            match self.client.list_comments(owner, repo, number).await {
-                Ok(comments) => {
-                    self.issue_comments.insert(number, comments);
-                }
-                Err(e) => self.status = format!("error loading comments: {e}"),
-            }
-        }
+        self.spawn_load_comments(number);
         Ok(())
     }
 
     async fn load_pr_comments(&mut self, number: u64) -> Result<()> {
-        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
-            match self.client.list_comments(owner, repo, number).await {
-                Ok(comments) => {
-                    self.pr_comments.insert(number, comments);
-                }
-                Err(e) => self.status = format!("error loading comments: {e}"),
-            }
-        }
+        self.spawn_load_comments(number);
         Ok(())
     }
 
@@ -1864,13 +2019,12 @@ impl App {
             return;
         }
 
-        let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
         match self.screen {
             Screen::Issues => {
                 let filtered: Vec<Issue> = self
                     .all_issues
                     .iter()
-                    .filter(|i| matcher.fuzzy_match(&i.title, &query).unwrap_or(0) > 0)
+                    .filter(|i| self.search_matcher.fuzzy_match(&i.title, &query).unwrap_or(0) > 0)
                     .cloned()
                     .collect();
                 self.issues_view.issues = filtered;
@@ -1881,7 +2035,7 @@ impl App {
                 let filtered: Vec<PullRequest> = self
                     .all_prs
                     .iter()
-                    .filter(|pr| matcher.fuzzy_match(&pr.title, &query).unwrap_or(0) > 0)
+                    .filter(|pr| self.search_matcher.fuzzy_match(&pr.title, &query).unwrap_or(0) > 0)
                     .cloned()
                     .collect();
                 self.prs_view.prs = filtered;
@@ -1918,19 +2072,11 @@ impl App {
     // --- Screen switching ---
 
     async fn switch_to_issues(&mut self) -> Result<()> {
-        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
+        if self.repo_owner.is_some() && self.repo_name.is_some() {
             self.loading = true;
-            let filter = if self.state_filter == "all" { None } else { Some(self.state_filter.as_str()) };
-            match self.client.list_issues(owner, repo, filter).await {
-                Ok(issues) => {
-                    let count = issues.len();
-                    self.all_issues = issues.clone();
-                    self.issues_view = IssuesView::new(issues);
-                    self.status = format!("{owner}/{repo} — {count} issues ({})", self.state_filter);
-                }
-                Err(e) => self.status = format!("error: {e}"),
-            }
-            self.loading = false;
+            self.all_issues.clear();
+            self.spawn_load_issues();
+            self.status = "loading issues...".to_string();
         }
         self.selected_issue = None;
         self.focus = FocusTarget::Issues;
@@ -1941,18 +2087,11 @@ impl App {
     }
 
     async fn switch_to_prs(&mut self) -> Result<()> {
-        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
+        if self.repo_owner.is_some() && self.repo_name.is_some() {
             self.loading = true;
-            match self.client.list_pull_requests(owner, repo, Some("open")).await {
-                Ok(prs) => {
-                    let count = prs.len();
-                    self.all_prs = prs.clone();
-                    self.prs_view = PRsView::new(prs);
-                    self.status = format!("{owner}/{repo} — {count} PRs");
-                }
-                Err(e) => self.status = format!("error: {e}"),
-            }
-            self.loading = false;
+            self.all_prs.clear();
+            self.spawn_load_prs();
+            self.status = "loading PRs...".to_string();
         }
         self.selected_pr = None;
         self.screen = Screen::PullRequests;
@@ -1960,34 +2099,19 @@ impl App {
     }
 
     async fn refresh_issues(&mut self) -> Result<()> {
-        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
-            self.status = format!("refreshing {owner}/{repo} issues...");
-            let filter = if self.state_filter == "all" { None } else { Some(self.state_filter.as_str()) };
-            match self.client.list_issues(owner, repo, filter).await {
-                Ok(issues) => {
-                    let count = issues.len();
-                    self.all_issues = issues.clone();
-                    self.issues_view = IssuesView::new(issues);
-                    self.status = format!("{owner}/{repo} — {count} issues ({})", self.state_filter);
-                }
-                Err(e) => self.status = format!("error: {e}"),
-            }
+        if self.repo_owner.is_some() && self.repo_name.is_some() {
+            self.status = "refreshing...".to_string();
+            self.loading = true;
+            self.spawn_load_issues();
         }
         Ok(())
     }
 
     async fn refresh_prs(&mut self) -> Result<()> {
-        if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
-            self.status = format!("refreshing {owner}/{repo} PRs...");
-            match self.client.list_pull_requests(owner, repo, None).await {
-                Ok(prs) => {
-                    let count = prs.len();
-                    self.all_prs = prs.clone();
-                    self.prs_view = PRsView::new(prs);
-                    self.status = format!("{owner}/{repo} — {count} PRs (refreshed)");
-                }
-                Err(e) => self.status = format!("error: {e}"),
-            }
+        if self.repo_owner.is_some() && self.repo_name.is_some() {
+            self.status = "refreshing...".to_string();
+            self.loading = true;
+            self.spawn_load_prs();
         }
         Ok(())
     }

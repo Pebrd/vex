@@ -10,18 +10,22 @@ pub struct PRsView {
     pub selected: usize,
     #[allow(dead_code)]
     pub filter_state: Option<String>,
+    list_state: ListState,
 }
 
 impl PRsView {
     pub fn new(prs: Vec<PullRequest>) -> Self {
+        let mut list_state = ListState::default();
+        list_state.select(Some(0));
         Self {
             prs,
             selected: 0,
             filter_state: None,
+            list_state,
         }
     }
 
-    pub fn draw(&self, frame: &mut Frame, area: Rect, detail_pr: Option<&PullRequest>, comments: Option<&[Comment]>) {
+    pub fn draw(&mut self, frame: &mut Frame, area: Rect, detail_pr: Option<&PullRequest>, comments: Option<&[Comment]>) {
         let layout = if detail_pr.is_some() {
             Layout::default()
                 .direction(Direction::Horizontal)
@@ -79,8 +83,7 @@ impl PRsView {
             })
             .collect();
 
-        let mut list_state = ListState::default();
-        list_state.select(Some(self.selected));
+        self.list_state.select(Some(self.selected));
 
         let list = List::new(items)
             .highlight_style(
@@ -90,7 +93,7 @@ impl PRsView {
             )
             .highlight_symbol("> ");
 
-        frame.render_stateful_widget(list, inner, &mut list_state);
+        frame.render_stateful_widget(list, inner, &mut self.list_state);
 
         if let (Some(pr), Some(comments)) = (detail_pr, comments) {
             self.draw_detail(frame, layout[1], pr, comments);
@@ -99,7 +102,7 @@ impl PRsView {
         }
     }
 
-    fn draw_detail(&self, frame: &mut Frame, area: Rect, pr: &PullRequest, comments: &[Comment]) {
+    fn draw_detail(&mut self, frame: &mut Frame, area: Rect, pr: &PullRequest, comments: &[Comment]) {
         let block = Block::default()
             .borders(Borders::ALL)
             .title(format!(" PR #{} ", pr.number))

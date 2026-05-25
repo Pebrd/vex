@@ -2,7 +2,7 @@ use crate::github::Issue;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph};
+use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
 use ratatui::Frame;
 use std::collections::BTreeMap;
 
@@ -12,6 +12,7 @@ pub struct RoadmapView {
     pub groups: Vec<(String, Vec<Issue>)>,
     pub selected_group: usize,
     pub selected_item: usize,
+    list_states: Vec<ListState>,
 }
 
 impl RoadmapView {
@@ -22,6 +23,7 @@ impl RoadmapView {
             groups: Vec::new(),
             selected_group: 0,
             selected_item: 0,
+            list_states: Vec::new(),
         }
     }
 
@@ -40,9 +42,14 @@ impl RoadmapView {
             }
         }
         self.groups = map.into_iter().collect();
+        self.list_states = self.groups.iter().map(|_| {
+            let mut s = ListState::default();
+            s.select(Some(0));
+            s
+        }).collect();
     }
 
-    pub fn draw(&self, frame: &mut Frame, area: Rect) {
+    pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
         let title = Paragraph::new(Line::from(vec![
             Span::styled(
                 format!(" {}/{} — Roadmap ", self.owner, self.repo),
@@ -90,11 +97,12 @@ impl RoadmapView {
                 .block(block)
                 .highlight_style(Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD));
 
-            let mut state = ratatui::widgets::ListState::default();
-            if is_selected {
-                state.select(Some(self.selected_item.min(issues.len().saturating_sub(1))));
+            if let Some(state) = self.list_states.get_mut(idx) {
+                if is_selected {
+                    state.select(Some(self.selected_item.min(issues.len().saturating_sub(1))));
+                }
+                frame.render_stateful_widget(list, columns[idx], state);
             }
-            frame.render_stateful_widget(list, columns[idx], &mut state);
         }
     }
 }
