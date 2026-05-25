@@ -379,14 +379,46 @@ impl App {
                     _ => {}
                 }
             }
-            KeyCode::Char('j') | KeyCode::Down => {
+            KeyCode::Down => {
                 if let InputMode::EditIssue { focus: 2, label_idx, available_labels, .. } = &mut self.input_mode {
                     *label_idx = (*label_idx + 1).min(available_labels.len().saturating_sub(1));
                 }
             }
-            KeyCode::Char('k') | KeyCode::Up => {
+            KeyCode::Up => {
                 if let InputMode::EditIssue { focus: 2, label_idx, .. } = &mut self.input_mode {
                     *label_idx = label_idx.saturating_sub(1);
+                }
+            }
+            KeyCode::Char('j') => {
+                match &mut self.input_mode {
+                    InputMode::EditIssue { focus: 2, label_idx, available_labels, .. } => {
+                        *label_idx = (*label_idx + 1).min(available_labels.len().saturating_sub(1));
+                    }
+                    InputMode::EditIssue { title, focus: 0, .. }
+                    | InputMode::EditNote { title, focus: 0, .. } => {
+                        title.push('j');
+                    }
+                    InputMode::EditIssue { body, focus: 1, .. }
+                    | InputMode::EditNote { body, focus: 1, .. } => {
+                        body.push('j');
+                    }
+                    _ => {}
+                }
+            }
+            KeyCode::Char('k') => {
+                match &mut self.input_mode {
+                    InputMode::EditIssue { focus: 2, label_idx, .. } => {
+                        *label_idx = label_idx.saturating_sub(1);
+                    }
+                    InputMode::EditIssue { title, focus: 0, .. }
+                    | InputMode::EditNote { title, focus: 0, .. } => {
+                        title.push('k');
+                    }
+                    InputMode::EditIssue { body, focus: 1, .. }
+                    | InputMode::EditNote { body, focus: 1, .. } => {
+                        body.push('k');
+                    }
+                    _ => {}
                 }
             }
             KeyCode::Char(' ') => {
