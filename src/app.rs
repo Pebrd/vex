@@ -217,10 +217,13 @@ impl App {
     }
 
     pub async fn run(&mut self, terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result<()> {
+        let mut last_redraw = Instant::now();
         while !self.should_quit {
-            if self.needs_redraw {
+            let elapsed = last_redraw.elapsed();
+            if self.needs_redraw || elapsed >= Duration::from_millis(16) {
                 terminal.draw(|frame| self.draw(frame))?;
                 self.needs_redraw = false;
+                last_redraw = Instant::now();
             }
             self.drain_bg_events();
             self.handle_events().await?;
@@ -465,6 +468,7 @@ impl App {
                 "Enter       open project",
                 "a           add project",
                 "d           delete project",
+                "Ctrl+o      open in file explorer",
                 "s           stats screen",
                 "t           roadmap screen",
                 "q           quit",
@@ -485,6 +489,7 @@ impl App {
                 "L           link note to issue",
                 "d           delete linked note",
                 "O           open in browser",
+                "Ctrl+o      open in file explorer",
                 "p           pull requests screen",
                 "s           stats screen",
                 "t           roadmap screen",
@@ -499,6 +504,7 @@ impl App {
                 "/           search",
                 "o           add comment",
                 "O           open in browser",
+                "Ctrl+o      open in file explorer",
                 "m           merge PR",
                 "c           create PR",
                 "i           issues screen",
@@ -519,11 +525,13 @@ impl App {
             ],
             Screen::Stats => vec![
                 "j/k         navigate",
+                "Ctrl+o      open in file explorer",
                 "q           back",
                 "g           dashboard",
             ],
             Screen::Roadmap => vec![
                 "h/j/k/l     navigate",
+                "Ctrl+o      open in file explorer",
                 "q           back",
                 "g           dashboard",
             ],
@@ -1378,6 +1386,11 @@ impl App {
                     self.status = "project deleted".to_string();
                 }
             }
+            KeyCode::Char('o') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if let Some(path) = self.dashboard.projects.get(self.dashboard.selected).map(|p| p.path.clone()) {
+                    self.open_in_explorer(std::path::Path::new(&path));
+                }
+            }
             _ => {}
         }
         Ok(())
@@ -1529,6 +1542,13 @@ impl App {
                     }
                 }
             }
+            KeyCode::Char('o') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if let Some(ref path) = self.repo_path.clone() {
+                    self.open_in_explorer(path);
+                } else {
+                    self.status = "no project directory".to_string();
+                }
+            }
             KeyCode::Char('o') => {
                 if self.focus == FocusTarget::Issues && self.selected_issue.is_some() {
                     self.input_mode = InputMode::Comment {
@@ -1670,6 +1690,13 @@ impl App {
                             selected: 0,
                         };
                     }
+                }
+            }
+            KeyCode::Char('o') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if let Some(ref path) = self.repo_path.clone() {
+                    self.open_in_explorer(path);
+                } else {
+                    self.status = "no project directory".to_string();
                 }
             }
             KeyCode::Char('o') => {
@@ -1956,6 +1983,19 @@ impl App {
     }
 
     // --- Actions ---
+
+    fn open_in_explorer(&mut self, path: &std::path::Path) {
+        let path_str = path.to_string_lossy().to_string();
+        match std::process::Command::new("xdg-open")
+            .arg(&path_str)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+        {
+            Ok(_) => self.status = format!("opened {}", path.display()),
+            Err(e) => self.status = format!("error opening explorer: {e}"),
+        }
+    }
 
     async fn create_issue(&mut self, title: &str, body: Option<&str>, labels: &[String]) -> Result<()> {
         if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
@@ -2498,6 +2538,13 @@ impl App {
             KeyCode::Char('k') | KeyCode::Up => {
                 self.stats_view.selected = self.stats_view.selected.saturating_sub(1);
             }
+            KeyCode::Char('o') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if let Some(ref path) = self.repo_path.clone() {
+                    self.open_in_explorer(path);
+                } else {
+                    self.status = "no project directory".to_string();
+                }
+            }
             _ => {}
         }
         Ok(())
@@ -2525,6 +2572,13 @@ impl App {
                 self.roadmap_view.selected_group = (self.roadmap_view.selected_group + 1)
                     .min(self.roadmap_view.groups.len().saturating_sub(1));
                 self.roadmap_view.selected_item = 0;
+            }
+            KeyCode::Char('o') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if let Some(ref path) = self.repo_path.clone() {
+                    self.open_in_explorer(path);
+                } else {
+                    self.status = "no project directory".to_string();
+                }
             }
             _ => {}
         }
