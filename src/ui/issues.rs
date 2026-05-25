@@ -369,29 +369,33 @@ impl IssuesView {
                         .add_modifier(Modifier::BOLD),
                 ),
             ]),
-            Line::from(vec![
-                Span::styled(
-                    "●",
-                    Style::default().fg(match issue.state.as_str() {
+            Line::from({
+                    let state_color = match issue.state.as_str() {
                         "open" => Color::Green,
                         _ => Color::Red,
-                    }),
-                ),
-                Span::styled(
-                    format!(" {} ", issue.state.to_uppercase()),
-                    Style::default()
-                        .fg(match issue.state.as_str() {
-                            "open" => Color::Green,
-                            _ => Color::Red,
-                        })
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::raw(" by "),
-                Span::styled(
-                    issue.author.as_deref().unwrap_or("unknown"),
-                    Style::default().fg(Color::Cyan),
-                ),
-            ]),
+                    };
+                    let state_style = Style::default().fg(state_color);
+                    let mut spans = vec![
+                        Span::styled("●", state_style),
+                        Span::styled(
+                            format!(" {} ", issue.state.to_uppercase()),
+                            state_style.add_modifier(Modifier::BOLD),
+                        ),
+                    ];
+                    for label in &issue.labels {
+                        spans.push(Span::styled(
+                            format!("[{}]", label),
+                            Style::default().fg(Color::Magenta),
+                        ));
+                        spans.push(Span::raw(" "));
+                    }
+                    spans.push(Span::raw("by "));
+                    spans.push(Span::styled(
+                        issue.author.as_deref().unwrap_or("unknown"),
+                        Style::default().fg(Color::Cyan),
+                    ));
+                    spans
+                }),
             Line::from(Span::raw("")),
         ];
 
