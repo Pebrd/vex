@@ -31,6 +31,21 @@ pub fn current_branch() -> Option<String> {
     }
 }
 
+#[allow(dead_code)]
+pub fn current_branch_for(repo_path: &Path) -> Option<String> {
+    let head_path = repo_path.join(".git/HEAD");
+    if !head_path.exists() {
+        return None;
+    }
+    let content = std::fs::read_to_string(head_path).ok()?;
+    let content = content.trim();
+    if let Some(ref_str) = content.strip_prefix("ref: refs/heads/") {
+        Some(ref_str.to_string())
+    } else {
+        None
+    }
+}
+
 pub fn project_root() -> Option<PathBuf> {
     let cwd = std::env::current_dir().ok()?;
     let git_dir = find_git_dir(&cwd)?;

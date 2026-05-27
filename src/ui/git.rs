@@ -66,7 +66,7 @@ impl GitScreen {
             }
         };
         self.loading = true;
-        self.current_branch = git::current_branch().unwrap_or_default();
+        self.current_branch = git::current_branch_for(&repo_path).unwrap_or_default();
         self.refresh_files(&repo_path);
         self.refresh_commits(&repo_path, 50);
         self.refresh_branches(&repo_path);
@@ -223,7 +223,7 @@ impl GitScreen {
     }
 
     fn refresh_data(&mut self, repo_path: &Path) {
-        self.current_branch = git::current_branch().unwrap_or_default();
+        self.current_branch = git::current_branch_for(repo_path).unwrap_or_default();
         self.refresh_files(repo_path);
         self.refresh_commits(repo_path, 50);
         self.refresh_branches(repo_path);
@@ -342,7 +342,7 @@ impl GitScreen {
             .border_style(border_style)
     }
 
-    fn draw_files_panel(&self, frame: &mut Frame, area: Rect) {
+    fn draw_files_panel(&mut self, frame: &mut Frame, area: Rect) {
         let items: Vec<ListItem> = self
             .files
             .iter()
@@ -379,10 +379,10 @@ impl GitScreen {
             .block(self.left_block("Files"))
             .highlight_style(Style::default().fg(Color::Black).bg(Color::White));
 
-        frame.render_stateful_widget(list, area, &mut self.files_list_state.clone());
+        frame.render_stateful_widget(list, area, &mut self.files_list_state);
     }
 
-    fn draw_commits_panel(&self, frame: &mut Frame, area: Rect) {
+    fn draw_commits_panel(&mut self, frame: &mut Frame, area: Rect) {
         let items: Vec<ListItem> = self
             .commits
             .iter()
@@ -408,10 +408,10 @@ impl GitScreen {
             .block(self.left_block("Commits"))
             .highlight_style(Style::default().fg(Color::Black).bg(Color::White));
 
-        frame.render_stateful_widget(list, area, &mut self.commits_list_state.clone());
+        frame.render_stateful_widget(list, area, &mut self.commits_list_state);
     }
 
-    fn draw_branches_panel(&self, frame: &mut Frame, area: Rect) {
+    fn draw_branches_panel(&mut self, frame: &mut Frame, area: Rect) {
         let items: Vec<ListItem> = self
             .branches
             .iter()
@@ -438,7 +438,7 @@ impl GitScreen {
             .block(self.left_block("Branches"))
             .highlight_style(Style::default().fg(Color::Black).bg(Color::White));
 
-        frame.render_stateful_widget(list, area, &mut self.branches_list_state.clone());
+        frame.render_stateful_widget(list, area, &mut self.branches_list_state);
     }
 
     fn draw_right_panel(&self, frame: &mut Frame, area: Rect) {
