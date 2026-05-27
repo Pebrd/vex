@@ -1,7 +1,8 @@
 use crate::config::Project;
+use crate::theme::Theme;
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
 
@@ -22,12 +23,12 @@ impl Dashboard {
         }
     }
 
-    pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
+    pub fn draw(&mut self, frame: &mut Frame, area: Rect, theme: &Theme) {
         if self.projects.is_empty() {
             let block = Block::default()
                 .borders(Borders::ALL)
                 .title(" vex — GitHub Issues TUI ")
-                .style(Style::default().fg(Color::Cyan));
+                .style(Style::default().fg(theme.accent));
             let inner = block.inner(area);
 
             let welcome = Paragraph::new(vec![
@@ -36,32 +37,30 @@ impl Dashboard {
                 Line::from(Span::raw("")),
                 Line::from(Span::styled(
                     "  No project selected",
-                    Style::default()
-                        .fg(Color::White)
-                        .add_modifier(Modifier::BOLD),
+                    Style::default().fg(theme.text).add_modifier(Modifier::BOLD),
                 )),
                 Line::from(Span::raw("")),
                 Line::from(Span::raw("  Launch vex from a git repository or add one:")),
                 Line::from(Span::raw("")),
                 Line::from(vec![
                     Span::raw("    "),
-                    Span::styled("a", Style::default().fg(Color::Cyan)),
+                    Span::styled("a", Style::default().fg(theme.accent)),
                     Span::raw("  browse for a project directory"),
                 ]),
                 Line::from(vec![
                     Span::raw("    "),
-                    Span::styled("q", Style::default().fg(Color::Cyan)),
+                    Span::styled("q", Style::default().fg(theme.accent)),
                     Span::raw("  quit"),
                 ]),
                 Line::from(Span::raw("")),
                 Line::from(Span::styled(
                     "  ─────────────────────────────────",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(theme.text_dim),
                 )),
                 Line::from(Span::raw("")),
                 Line::from(Span::styled(
                     "  Quick capture:",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(theme.text_dim),
                 )),
                 Line::from(Span::raw(
                     "    vex add \"note title\" --body \"...\" --priority high",
@@ -76,7 +75,7 @@ impl Dashboard {
         let block = Block::default()
             .borders(Borders::ALL)
             .title(format!(" Projects ({}) ", self.projects.len()))
-            .style(Style::default().fg(Color::Cyan));
+            .style(Style::default().fg(theme.accent));
         let inner = block.inner(area);
 
         let items: Vec<ListItem> = self
@@ -87,27 +86,31 @@ impl Dashboard {
                 let warning = if !exists {
                     Span::styled(
                         "⚠ ",
-                        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                        Style::default()
+                            .fg(theme.danger)
+                            .add_modifier(Modifier::BOLD),
                     )
                 } else {
                     Span::raw("  ")
                 };
                 let name_style = if !exists {
-                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+                    Style::default()
+                        .fg(theme.danger)
+                        .add_modifier(Modifier::BOLD)
                 } else {
                     Style::default()
-                        .fg(Color::Green)
+                        .fg(theme.success)
                         .add_modifier(Modifier::BOLD)
                 };
                 let content = Line::from(vec![
                     warning,
                     Span::styled(&p.name, name_style),
                     Span::raw("  "),
-                    Span::styled(&p.path, Style::default().fg(Color::DarkGray)),
+                    Span::styled(&p.path, Style::default().fg(theme.text_dim)),
                     Span::raw("  "),
                     Span::styled(
                         format!("{}/{}", p.owner, p.repo),
-                        Style::default().fg(Color::Cyan),
+                        Style::default().fg(theme.accent),
                     ),
                 ]);
                 ListItem::new(content)
@@ -119,7 +122,7 @@ impl Dashboard {
         let list = List::new(items)
             .highlight_style(
                 Style::default()
-                    .bg(Color::DarkGray)
+                    .bg(theme.selection)
                     .add_modifier(Modifier::BOLD),
             )
             .highlight_symbol("> ");

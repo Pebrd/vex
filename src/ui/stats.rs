@@ -1,7 +1,8 @@
 use crate::github::{Issue, PullRequest};
+use crate::theme::Theme;
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
 
@@ -49,18 +50,18 @@ impl StatsView {
         ];
     }
 
-    pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
+    pub fn draw(&mut self, frame: &mut Frame, area: Rect, theme: &Theme) {
         let title = Paragraph::new(Line::from(vec![Span::styled(
             format!(" {}/{} — Statistics ", self.owner, self.repo),
             Style::default()
-                .fg(Color::Cyan)
+                .fg(theme.accent)
                 .add_modifier(Modifier::BOLD),
         )]));
         frame.render_widget(title, area);
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .style(Style::default().fg(Color::Cyan));
+            .style(Style::default().fg(theme.accent));
         let inner = block.inner(area);
 
         let items: Vec<ListItem> = self
@@ -71,11 +72,11 @@ impl StatsView {
                     ListItem::new(Line::from(""))
                 } else {
                     let color = if s.contains("open") {
-                        Color::Green
+                        theme.success
                     } else if s.contains("closed") || s.contains("merged") {
-                        Color::Yellow
+                        theme.warning
                     } else {
-                        Color::White
+                        theme.text
                     };
                     ListItem::new(Line::from(Span::styled(s, Style::default().fg(color))))
                 }
@@ -86,7 +87,7 @@ impl StatsView {
             .block(block)
             .highlight_style(
                 Style::default()
-                    .bg(Color::DarkGray)
+                    .bg(theme.selection)
                     .add_modifier(Modifier::BOLD),
             )
             .highlight_symbol("> ");

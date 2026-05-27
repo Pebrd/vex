@@ -1,6 +1,7 @@
+use crate::theme::Theme;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
 use std::path::{Path, PathBuf};
@@ -113,7 +114,7 @@ impl FileBrowser {
             .unwrap_or(false)
     }
 
-    pub fn draw(&self, frame: &mut Frame, area: Rect) {
+    pub fn draw(&self, frame: &mut Frame, area: Rect, theme: &Theme) {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -127,7 +128,7 @@ impl FileBrowser {
         let path_display = Paragraph::new(Line::from(Span::styled(
             &*path_str,
             Style::default()
-                .fg(Color::Cyan)
+                .fg(theme.accent)
                 .add_modifier(Modifier::BOLD),
         )));
         frame.render_widget(path_display, layout[0]);
@@ -145,18 +146,18 @@ impl FileBrowser {
                 };
                 let name_style = if e.is_dir {
                     Style::default()
-                        .fg(Color::Yellow)
+                        .fg(theme.warning)
                         .add_modifier(Modifier::BOLD)
                 } else {
-                    Style::default().fg(Color::White)
+                    Style::default().fg(theme.text)
                 };
                 let git_indicator = if e.is_git_repo {
-                    Span::styled(" ", Style::default().fg(Color::Green))
+                    Span::styled(" ", Style::default().fg(theme.success))
                 } else {
                     Span::raw("")
                 };
                 ListItem::new(Line::from(vec![
-                    Span::styled(icon, Style::default().fg(Color::DarkGray)),
+                    Span::styled(icon, Style::default().fg(theme.text_dim)),
                     Span::styled(&e.name, name_style),
                     git_indicator,
                 ]))
@@ -169,7 +170,7 @@ impl FileBrowser {
         let list = List::new(items)
             .highlight_style(
                 Style::default()
-                    .bg(Color::DarkGray)
+                    .bg(theme.selection)
                     .add_modifier(Modifier::BOLD),
             )
             .highlight_symbol("> ")
@@ -177,14 +178,14 @@ impl FileBrowser {
                 Block::default()
                     .borders(Borders::ALL)
                     .title(" Select a git project ")
-                    .style(Style::default().fg(Color::Cyan)),
+                    .style(Style::default().fg(theme.accent)),
             );
 
         frame.render_stateful_widget(list, layout[1], &mut list_state);
 
         let hint = Paragraph::new(Line::from(Span::styled(
             " j/k navigate  enter enter dir / select  esc go up  h toggle hidden  q cancel ",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(theme.text_dim),
         )));
         frame.render_widget(hint, layout[2]);
     }

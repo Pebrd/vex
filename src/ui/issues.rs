@@ -1,5 +1,6 @@
 use crate::github::{Comment, Issue};
 use crate::notes::Note;
+use crate::theme::Theme;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -62,6 +63,7 @@ impl IssuesView {
         focus: FocusTarget,
         editing: Option<&EditState>,
         detail_scroll: u16,
+        theme: &Theme,
     ) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
@@ -73,17 +75,18 @@ impl IssuesView {
             .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
             .split(layout[0]);
 
-        self.draw_issues_list(frame, left_panels[0], focus == FocusTarget::Issues);
+        self.draw_issues_list(frame, left_panels[0], focus == FocusTarget::Issues, theme);
         self.draw_notes_list(
             frame,
             left_panels[1],
             notes,
             note_selected,
             focus == FocusTarget::Notes,
+            theme,
         );
 
         if let Some(editing) = editing {
-            self.draw_detail_editing(frame, layout[1], editing);
+            self.draw_detail_editing(frame, layout[1], editing, theme);
         } else if let Some(issue) = detail_issue {
             self.draw_detail(
                 frame,
@@ -91,19 +94,20 @@ impl IssuesView {
                 issue,
                 comments.unwrap_or(&[]),
                 detail_scroll,
+                theme,
             );
         } else if focus == FocusTarget::Notes {
             if let Some(note) = notes.get(note_selected) {
-                self.draw_note_detail(frame, layout[1], note, detail_scroll);
+                self.draw_note_detail(frame, layout[1], note, detail_scroll, theme);
             }
         }
     }
 
-    fn draw_issues_list(&mut self, frame: &mut Frame, area: Rect, is_active: bool) {
+    fn draw_issues_list(&mut self, frame: &mut Frame, area: Rect, is_active: bool, theme: &Theme) {
         let border_style = if is_active {
-            Style::default().fg(Color::Cyan)
+            Style::default().fg(theme.accent)
         } else {
-            Style::default().fg(Color::DarkGray)
+            Style::default().fg(theme.border)
         };
         let block = Block::default()
             .borders(Borders::ALL)
@@ -117,15 +121,18 @@ impl IssuesView {
             .iter()
             .map(|i| {
                 let state_style = match i.state.as_str() {
-                    "open" => Style::default().fg(Color::Green),
-                    "closed" => Style::default().fg(Color::Red),
-                    _ => Style::default().fg(Color::Yellow),
+                    "open" => Style::default().fg(theme.success),
+                    "closed" => Style::default().fg(theme.danger),
+                    _ => Style::default().fg(theme.warning),
                 };
 
                 let state_tag = format!(" {} ", if i.state == "open" { "OPEN" } else { "CLOSED" });
                 let mut spans = vec![
                     Span::styled(state_tag, state_style.add_modifier(Modifier::REVERSED)),
-                    Span::styled(format!(" #{} ", i.number), Style::default().fg(Color::Cyan)),
+                    Span::styled(
+                        format!(" #{} ", i.number),
+                        Style::default().fg(theme.accent),
+                    ),
                     Span::raw(&i.title),
                 ];
 
@@ -134,7 +141,7 @@ impl IssuesView {
                     for label in &i.labels {
                         spans.push(Span::styled(
                             format!("[{}]", label),
-                            Style::default().fg(Color::Magenta),
+                            Style::default().fg(theme.accent),
                         ));
                     }
                 }
@@ -147,10 +154,10 @@ impl IssuesView {
 
         let highlight = if is_active {
             Style::default()
-                .bg(Color::DarkGray)
+                .bg(theme.selection)
                 .add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(Color::DarkGray)
+            Style::default().fg(theme.text_dim)
         };
 
         let list = List::new(items)
@@ -167,11 +174,12 @@ impl IssuesView {
         notes: &[Note],
         selected: usize,
         is_active: bool,
+        theme: &Theme,
     ) {
         let border_style = if is_active {
-            Style::default().fg(Color::Cyan)
+            Style::default().fg(theme.accent)
         } else {
-            Style::default().fg(Color::DarkGray)
+            Style::default().fg(theme.border)
         };
         let block = Block::default()
             .borders(Borders::ALL)
@@ -184,9 +192,9 @@ impl IssuesView {
             .iter()
             .map(|n| {
                 let priority_style = match n.priority.as_str() {
-                    "high" => Style::default().fg(Color::Red),
-                    "medium" => Style::default().fg(Color::Yellow),
-                    _ => Style::default().fg(Color::Blue),
+                    "high" => Style::default().fg(theme.danger),
+                    "medium" => Style::default().fg(theme.warning),
+                    _ => Style::default().fg(theme.accent),
                 };
                 let status_icon = if n.status == "open" { " " } else { " " };
 
@@ -208,7 +216,7 @@ impl IssuesView {
                     spans.push(Span::raw(" "));
                     spans.push(Span::styled(
                         format!("#{num}"),
-                        Style::default().fg(Color::Magenta),
+                        Style::default().fg(theme.accent),
                     ));
                 }
 
@@ -220,10 +228,10 @@ impl IssuesView {
 
         let highlight = if is_active {
             Style::default()
-                .bg(Color::DarkGray)
+                .bg(theme.selection)
                 .add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(Color::DarkGray)
+            Style::default().fg(theme.text_dim)
         };
 
         let list = List::new(items)
@@ -233,7 +241,13 @@ impl IssuesView {
         frame.render_stateful_widget(list, inner, &mut self.notes_list_state);
     }
 
-    fn draw_detail_editing(&self, frame: &mut Frame, area: Rect, editing: &EditState) {
+    fn draw_detail_editing(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        editing: &EditState,
+        theme: &Theme,
+    ) {
         let is_note = editing.note_slug.is_some();
         let label_count = editing.labels.len();
         let title_text = if is_note {
@@ -261,7 +275,7 @@ impl IssuesView {
         let block = Block::default()
             .borders(Borders::ALL)
             .title(title_text)
-            .style(Style::default().fg(Color::Yellow));
+            .style(Style::default().fg(theme.warning));
         let inner = block.inner(area);
 
         let has_label_tags = !editing.available_labels.is_empty()
@@ -279,9 +293,9 @@ impl IssuesView {
             .split(inner);
 
         let title_style = if editing.field_focus == 0 {
-            Style::default().bg(Color::DarkGray).fg(Color::White)
+            Style::default().bg(theme.selection).fg(theme.text)
         } else {
-            Style::default().fg(Color::White)
+            Style::default().fg(theme.text)
         };
         let title_ptr = if editing.field_focus == 0 {
             "▶ "
@@ -294,13 +308,13 @@ impl IssuesView {
             .style(title_style);
         let mut title_spans: Vec<Span> = vec![Span::raw(&editing.title)];
         if editing.field_focus == 0 {
-            title_spans.push(Span::styled("|", Style::default().fg(Color::Cyan)));
+            title_spans.push(Span::styled("|", Style::default().fg(theme.accent)));
         }
         let title_text = Paragraph::new(Line::from(title_spans)).block(title_block);
         frame.render_widget(title_text, chunks[0]);
 
         if editing.field_focus == 2 {
-            let label_style = Style::default().bg(Color::DarkGray).fg(Color::White);
+            let label_style = Style::default().bg(theme.selection).fg(theme.text);
             let label_ptr = "▶ ";
             let title = format!(
                 "{label_ptr}Labels ({}/{} selected)",
@@ -327,13 +341,13 @@ impl IssuesView {
                     let is_sel = idx == editing.label_idx;
                     let style = if is_sel {
                         Style::default()
-                            .fg(Color::Cyan)
+                            .fg(theme.accent)
                             .add_modifier(Modifier::BOLD)
                     } else {
-                        Style::default().fg(Color::White)
+                        Style::default().fg(theme.text)
                     };
                     ListItem::new(Line::from(vec![
-                        Span::styled(checked, Style::default().fg(Color::Green)),
+                        Span::styled(checked, Style::default().fg(theme.success)),
                         Span::styled(name, style),
                     ]))
                 })
@@ -342,14 +356,14 @@ impl IssuesView {
             let mut list_state = ListState::default();
             list_state.select(Some(editing.label_idx));
             let list = List::new(items)
-                .highlight_style(Style::default().bg(Color::DarkGray))
+                .highlight_style(Style::default().bg(theme.selection))
                 .highlight_symbol("> ");
             frame.render_stateful_widget(list, label_inner, &mut list_state);
         } else {
             let body_style = if editing.field_focus == 1 {
-                Style::default().bg(Color::DarkGray).fg(Color::White)
+                Style::default().bg(theme.selection).fg(theme.text)
             } else {
-                Style::default().fg(Color::White)
+                Style::default().fg(theme.text)
             };
             let body_ptr = if editing.field_focus == 1 {
                 "▶ "
@@ -367,11 +381,11 @@ impl IssuesView {
                 .collect();
             if editing.field_focus == 1 {
                 if let Some(last) = body_lines.last_mut() {
-                    last.push_span(Span::styled("|", Style::default().fg(Color::Cyan)));
+                    last.push_span(Span::styled("|", Style::default().fg(theme.accent)));
                 } else {
                     body_lines.push(Line::from(Span::styled(
                         "|",
-                        Style::default().fg(Color::Cyan),
+                        Style::default().fg(theme.accent),
                     )));
                 }
             }
@@ -391,7 +405,7 @@ impl IssuesView {
                     vec![
                         Span::styled(
                             format!(" {l} "),
-                            Style::default().fg(Color::Black).bg(Color::Cyan),
+                            Style::default().fg(Color::Black).bg(theme.accent),
                         ),
                         Span::raw(" "),
                     ]
@@ -403,13 +417,13 @@ impl IssuesView {
         }
 
         let help = Paragraph::new(Line::from(vec![
-            Span::styled("Tab", Style::default().fg(Color::Cyan)),
+            Span::styled("Tab", Style::default().fg(theme.accent)),
             Span::raw(" switch  "),
-            Span::styled("Space", Style::default().fg(Color::Cyan)),
+            Span::styled("Space", Style::default().fg(theme.accent)),
             Span::raw(" toggle label  "),
-            Span::styled("Ctrl+S", Style::default().fg(Color::Cyan)),
+            Span::styled("Ctrl+S", Style::default().fg(theme.accent)),
             Span::raw(" save  "),
-            Span::styled("Esc", Style::default().fg(Color::Cyan)),
+            Span::styled("Esc", Style::default().fg(theme.accent)),
             Span::raw(" cancel"),
         ]));
         frame.render_widget(help, chunks[help_idx]);
@@ -424,23 +438,22 @@ impl IssuesView {
         issue: &Issue,
         comments: &[Comment],
         scroll: u16,
+        theme: &Theme,
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
             .title(format!(" Issue #{} ", issue.number))
-            .style(Style::default().fg(Color::Cyan));
+            .style(Style::default().fg(theme.accent));
 
         let mut lines = vec![
             Line::from(vec![Span::styled(
                 &issue.title,
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(theme.text).add_modifier(Modifier::BOLD),
             )]),
             Line::from({
                 let state_color = match issue.state.as_str() {
-                    "open" => Color::Green,
-                    _ => Color::Red,
+                    "open" => theme.success,
+                    _ => theme.danger,
                 };
                 let state_style = Style::default().fg(state_color);
                 let mut spans = vec![
@@ -453,14 +466,14 @@ impl IssuesView {
                 for label in &issue.labels {
                     spans.push(Span::styled(
                         format!("[{}]", label),
-                        Style::default().fg(Color::Magenta),
+                        Style::default().fg(theme.accent),
                     ));
                     spans.push(Span::raw(" "));
                 }
                 spans.push(Span::raw("by "));
                 spans.push(Span::styled(
                     issue.author.as_deref().unwrap_or("unknown"),
-                    Style::default().fg(Color::Cyan),
+                    Style::default().fg(theme.accent),
                 ));
                 spans
             }),
@@ -478,7 +491,7 @@ impl IssuesView {
             lines.push(Line::from(Span::styled(
                 format!("─── {} comments ───", comments.len()),
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(theme.accent)
                     .add_modifier(Modifier::BOLD),
             )));
             lines.push(Line::from(Span::raw("")));
@@ -488,12 +501,12 @@ impl IssuesView {
                     Span::styled(
                         comment.author.as_deref().unwrap_or("unknown"),
                         Style::default()
-                            .fg(Color::Cyan)
+                            .fg(theme.accent)
                             .add_modifier(Modifier::BOLD),
                     ),
                     Span::styled(
                         format!("  {}", comment.created_at.as_deref().unwrap_or("")),
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(theme.text_dim),
                     ),
                 ]));
                 if let Some(body) = &comment.body {
@@ -512,44 +525,51 @@ impl IssuesView {
         frame.render_widget(detail, area);
     }
 
-    fn draw_note_detail(&self, frame: &mut Frame, area: Rect, note: &Note, scroll: u16) {
+    fn draw_note_detail(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        note: &Note,
+        scroll: u16,
+        theme: &Theme,
+    ) {
         let block = Block::default()
             .borders(Borders::ALL)
             .title(format!(" Note: {} ", note.title))
-            .style(Style::default().fg(Color::Cyan));
+            .style(Style::default().fg(theme.accent));
 
         let mut lines = vec![
             Line::from(vec![
-                Span::styled("Status: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Status: ", Style::default().fg(theme.text_dim)),
                 Span::styled(
                     &note.status,
                     Style::default().fg(match note.status.as_str() {
-                        "open" => Color::Green,
-                        _ => Color::Red,
+                        "open" => theme.success,
+                        _ => theme.danger,
                     }),
                 ),
                 Span::raw(" | "),
-                Span::styled("Priority: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Priority: ", Style::default().fg(theme.text_dim)),
                 Span::styled(
                     &note.priority,
                     Style::default().fg(match note.priority.as_str() {
-                        "high" => Color::Red,
-                        "medium" => Color::Yellow,
-                        _ => Color::Blue,
+                        "high" => theme.danger,
+                        "medium" => theme.warning,
+                        _ => theme.accent,
                     }),
                 ),
             ]),
             Line::from(vec![
-                Span::styled("Created: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(&note.created_at, Style::default().fg(Color::White)),
+                Span::styled("Created: ", Style::default().fg(theme.text_dim)),
+                Span::styled(&note.created_at, Style::default().fg(theme.text)),
             ]),
             Line::from(Span::raw("")),
         ];
 
         if let Some(num) = note.issue {
             lines.push(Line::from(vec![
-                Span::styled("Linked to issue: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(format!("#{num}"), Style::default().fg(Color::Magenta)),
+                Span::styled("Linked to issue: ", Style::default().fg(theme.text_dim)),
+                Span::styled(format!("#{num}"), Style::default().fg(theme.accent)),
             ]));
             lines.push(Line::from(Span::raw("")));
         }

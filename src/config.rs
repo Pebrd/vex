@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,6 +19,10 @@ pub struct Config {
     pub last_path: Option<String>,
     #[serde(default)]
     pub selected_cli: Option<String>,
+    #[serde(default)]
+    pub theme: Option<String>,
+    #[serde(default)]
+    pub theme_overrides: Option<HashMap<String, String>>,
 }
 
 fn default_true() -> bool {
@@ -43,6 +48,8 @@ impl Default for Config {
             last_repo: None,
             last_path: None,
             selected_cli: None,
+            theme: None,
+            theme_overrides: None,
         }
     }
 }

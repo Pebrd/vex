@@ -1,7 +1,8 @@
 use crate::github::{Comment, PullRequest};
+use crate::theme::Theme;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
 
@@ -31,6 +32,7 @@ impl PRsView {
         area: Rect,
         detail_pr: Option<&PullRequest>,
         comments: Option<&[Comment]>,
+        theme: &Theme,
     ) {
         let layout = if detail_pr.is_some() {
             Layout::default()
@@ -47,7 +49,7 @@ impl PRsView {
         let block = Block::default()
             .borders(Borders::ALL)
             .title(" Pull Requests ")
-            .style(Style::default().fg(Color::Cyan));
+            .style(Style::default().fg(theme.accent));
         let inner = block.inner(layout[0]);
 
         frame.render_widget(block, layout[0]);
@@ -72,19 +74,19 @@ impl PRsView {
                 ListItem::new(Line::from(vec![
                     Span::styled(
                         format!(" #{} ", pr.number),
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(theme.text_dim),
                     ),
                     Span::styled(
                         if pr.state == "open" { " " } else { " " },
                         Style::default().fg(if pr.state == "open" {
-                            Color::Green
+                            theme.success
                         } else {
-                            Color::Red
+                            theme.danger
                         }),
                     ),
                     Span::raw(&pr.title),
-                    Span::styled(checks_indicator, Style::default().fg(Color::Green)),
-                    Span::styled(merge_indicator, Style::default().fg(Color::Red)),
+                    Span::styled(checks_indicator, Style::default().fg(theme.success)),
+                    Span::styled(merge_indicator, Style::default().fg(theme.danger)),
                 ]))
             })
             .collect();
@@ -94,7 +96,7 @@ impl PRsView {
         let list = List::new(items)
             .highlight_style(
                 Style::default()
-                    .bg(Color::DarkGray)
+                    .bg(theme.selection)
                     .add_modifier(Modifier::BOLD),
             )
             .highlight_symbol("> ");
@@ -102,9 +104,9 @@ impl PRsView {
         frame.render_stateful_widget(list, inner, &mut self.list_state);
 
         if let (Some(pr), Some(comments)) = (detail_pr, comments) {
-            self.draw_detail(frame, layout[1], pr, comments);
+            self.draw_detail(frame, layout[1], pr, comments, theme);
         } else if let Some(pr) = detail_pr {
-            self.draw_detail(frame, layout[1], pr, &[]);
+            self.draw_detail(frame, layout[1], pr, &[], theme);
         }
     }
 
@@ -114,34 +116,33 @@ impl PRsView {
         area: Rect,
         pr: &PullRequest,
         comments: &[Comment],
+        theme: &Theme,
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
             .title(format!(" PR #{} ", pr.number))
-            .style(Style::default().fg(Color::Cyan));
+            .style(Style::default().fg(theme.accent));
 
         let mut lines = vec![
             Line::from(vec![Span::styled(
                 &pr.title,
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(theme.text).add_modifier(Modifier::BOLD),
             )]),
             Line::from(vec![
                 Span::raw(" by "),
                 Span::styled(
                     pr.author.as_deref().unwrap_or("unknown"),
-                    Style::default().fg(Color::Cyan),
+                    Style::default().fg(theme.accent),
                 ),
                 Span::raw(" | "),
                 Span::styled(
                     pr.head_branch.as_deref().unwrap_or("?"),
-                    Style::default().fg(Color::Yellow),
+                    Style::default().fg(theme.warning),
                 ),
                 Span::raw(" → "),
                 Span::styled(
                     pr.base_branch.as_deref().unwrap_or("?"),
-                    Style::default().fg(Color::Yellow),
+                    Style::default().fg(theme.warning),
                 ),
             ]),
             Line::from(vec![
@@ -149,26 +150,26 @@ impl PRsView {
                 Span::styled(
                     &pr.state,
                     Style::default().fg(match pr.state.as_str() {
-                        "open" => Color::Green,
-                        _ => Color::Red,
+                        "open" => theme.success,
+                        _ => theme.danger,
                     }),
                 ),
                 Span::raw(" | Mergeable: "),
                 Span::styled(
                     pr.mergeable.as_deref().unwrap_or("unknown"),
                     Style::default().fg(match pr.mergeable.as_deref() {
-                        Some("mergeable") => Color::Green,
-                        Some("conflict") => Color::Red,
-                        _ => Color::Yellow,
+                        Some("mergeable") => theme.success,
+                        Some("conflict") => theme.danger,
+                        _ => theme.warning,
                     }),
                 ),
                 Span::raw(" | Checks: "),
                 Span::styled(
                     pr.checks_state.as_deref().unwrap_or("?"),
                     Style::default().fg(match pr.checks_state.as_deref() {
-                        Some("success") => Color::Green,
-                        Some("failure") => Color::Red,
-                        _ => Color::Yellow,
+                        Some("success") => theme.success,
+                        Some("failure") => theme.danger,
+                        _ => theme.warning,
                     }),
                 ),
             ]),
@@ -186,7 +187,7 @@ impl PRsView {
             lines.push(Line::from(Span::styled(
                 format!("─── {} comments ───", comments.len()),
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(theme.accent)
                     .add_modifier(Modifier::BOLD),
             )));
             lines.push(Line::from(Span::raw("")));
@@ -196,12 +197,12 @@ impl PRsView {
                     Span::styled(
                         comment.author.as_deref().unwrap_or("unknown"),
                         Style::default()
-                            .fg(Color::Cyan)
+                            .fg(theme.accent)
                             .add_modifier(Modifier::BOLD),
                     ),
                     Span::styled(
                         format!("  {}", comment.created_at.as_deref().unwrap_or("")),
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(theme.text_dim),
                     ),
                 ]));
                 if let Some(body) = &comment.body {

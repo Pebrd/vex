@@ -1,7 +1,8 @@
 use crate::github::Issue;
+use crate::theme::Theme;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
 use std::collections::BTreeMap;
@@ -55,18 +56,18 @@ impl RoadmapView {
             .collect();
     }
 
-    pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
+    pub fn draw(&mut self, frame: &mut Frame, area: Rect, theme: &Theme) {
         let title = Paragraph::new(Line::from(vec![Span::styled(
             format!(" {}/{} — Roadmap ", self.owner, self.repo),
             Style::default()
-                .fg(Color::Cyan)
+                .fg(theme.accent)
                 .add_modifier(Modifier::BOLD),
         )]));
         frame.render_widget(title, area);
 
         if self.groups.is_empty() {
             let empty = Paragraph::new("no open issues with labels")
-                .style(Style::default().fg(Color::DarkGray));
+                .style(Style::default().fg(theme.text_dim));
             frame.render_widget(empty, area);
             return;
         }
@@ -85,9 +86,9 @@ impl RoadmapView {
         for (idx, (label, issues)) in self.groups.iter().enumerate() {
             let is_selected = idx == self.selected_group;
             let border_color = if is_selected {
-                Color::Green
+                theme.accent
             } else {
-                Color::DarkGray
+                theme.border
             };
             let title_text = format!(" {label} ({})", issues.len());
 
@@ -101,14 +102,14 @@ impl RoadmapView {
                 .map(|issue| {
                     ListItem::new(Line::from(Span::styled(
                         format!("#{} {}", issue.number, issue.title),
-                        Style::default().fg(Color::White),
+                        Style::default().fg(theme.text),
                     )))
                 })
                 .collect();
 
             let list = List::new(items).block(block).highlight_style(
                 Style::default()
-                    .bg(Color::DarkGray)
+                    .bg(theme.selection)
                     .add_modifier(Modifier::BOLD),
             );
 

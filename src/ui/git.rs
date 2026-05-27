@@ -1,4 +1,5 @@
 use crate::git::{self, BranchInfo, CommitInfo, FileStatus};
+use crate::theme::Theme;
 use anyhow::Result;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
@@ -303,26 +304,26 @@ impl GitScreen {
 
 #[allow(dead_code)]
 impl GitScreen {
-    pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
+    pub fn draw(&mut self, frame: &mut Frame, area: Rect, theme: &Theme) {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Ratio(1, 3), Constraint::Ratio(2, 3)])
             .split(area);
 
         match self.mode {
-            GitMode::Files => self.draw_files_panel(frame, chunks[0]),
-            GitMode::Commits => self.draw_commits_panel(frame, chunks[0]),
-            GitMode::Branches => self.draw_branches_panel(frame, chunks[0]),
+            GitMode::Files => self.draw_files_panel(frame, chunks[0], theme),
+            GitMode::Commits => self.draw_commits_panel(frame, chunks[0], theme),
+            GitMode::Branches => self.draw_branches_panel(frame, chunks[0], theme),
         }
 
-        self.draw_right_panel(frame, chunks[1]);
+        self.draw_right_panel(frame, chunks[1], theme);
     }
 
-    fn left_block(&self, title: &str) -> Block<'static> {
+    fn left_block(&self, title: &str, theme: &Theme) -> Block<'static> {
         let border_style = if self.focus {
-            Style::default().fg(Color::Cyan)
+            Style::default().fg(theme.accent)
         } else {
-            Style::default().fg(Color::DarkGray)
+            Style::default().fg(theme.border)
         };
         Block::default()
             .title(format!(" {title} "))
@@ -330,11 +331,11 @@ impl GitScreen {
             .border_style(border_style)
     }
 
-    fn right_block(&self, title: &str) -> Block<'static> {
+    fn right_block(&self, title: &str, theme: &Theme) -> Block<'static> {
         let border_style = if !self.focus {
-            Style::default().fg(Color::Cyan)
+            Style::default().fg(theme.accent)
         } else {
-            Style::default().fg(Color::DarkGray)
+            Style::default().fg(theme.border)
         };
         Block::default()
             .title(format!(" {title} "))
@@ -342,30 +343,30 @@ impl GitScreen {
             .border_style(border_style)
     }
 
-    fn draw_files_panel(&mut self, frame: &mut Frame, area: Rect) {
+    fn draw_files_panel(&mut self, frame: &mut Frame, area: Rect, theme: &Theme) {
         let items: Vec<ListItem> = self
             .files
             .iter()
             .map(|f| {
                 let (symbol, style) = if f.is_untracked {
-                    ("[+]", Style::default().fg(Color::Green))
+                    ("[+]", Style::default().fg(theme.success))
                 } else if f.staged {
                     match f.status.trim() {
                         "M" => (
                             "[M]",
                             Style::default()
-                                .fg(Color::Green)
+                                .fg(theme.success)
                                 .add_modifier(Modifier::BOLD),
                         ),
-                        "A" => ("[A]", Style::default().fg(Color::Green)),
-                        "D" => ("[D]", Style::default().fg(Color::Red)),
-                        _ => (&f.status[..3], Style::default().fg(Color::Green)),
+                        "A" => ("[A]", Style::default().fg(theme.success)),
+                        "D" => ("[D]", Style::default().fg(theme.danger)),
+                        _ => (&f.status[..3], Style::default().fg(theme.success)),
                     }
                 } else {
                     match f.status.trim() {
-                        "M" => ("[M]", Style::default().fg(Color::Yellow)),
-                        "D" => ("[D]", Style::default().fg(Color::Red)),
-                        _ => ("[?]", Style::default().fg(Color::Yellow)),
+                        "M" => ("[M]", Style::default().fg(theme.warning)),
+                        "D" => ("[D]", Style::default().fg(theme.danger)),
+                        _ => ("[?]", Style::default().fg(theme.warning)),
                     }
                 };
                 ListItem::new(Line::from(Span::styled(
@@ -376,13 +377,13 @@ impl GitScreen {
             .collect();
 
         let list = List::new(items)
-            .block(self.left_block("Files"))
-            .highlight_style(Style::default().fg(Color::Black).bg(Color::White));
+            .block(self.left_block("Files", theme))
+            .highlight_style(Style::default().fg(Color::Black).bg(theme.selection));
 
         frame.render_stateful_widget(list, area, &mut self.files_list_state);
     }
 
-    fn draw_commits_panel(&mut self, frame: &mut Frame, area: Rect) {
+    fn draw_commits_panel(&mut self, frame: &mut Frame, area: Rect, theme: &Theme) {
         let items: Vec<ListItem> = self
             .commits
             .iter()
@@ -395,23 +396,23 @@ impl GitScreen {
                 let label = format!("{} {}{}", c.short_id, c.message, branch_tag);
                 let style = if c.is_head {
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(theme.accent)
                         .add_modifier(Modifier::BOLD)
                 } else {
-                    Style::default().fg(Color::White)
+                    Style::default().fg(theme.text)
                 };
                 ListItem::new(Line::from(Span::styled(label, style)))
             })
             .collect();
 
         let list = List::new(items)
-            .block(self.left_block("Commits"))
-            .highlight_style(Style::default().fg(Color::Black).bg(Color::White));
+            .block(self.left_block("Commits", theme))
+            .highlight_style(Style::default().fg(Color::Black).bg(theme.selection));
 
         frame.render_stateful_widget(list, area, &mut self.commits_list_state);
     }
 
-    fn draw_branches_panel(&mut self, frame: &mut Frame, area: Rect) {
+    fn draw_branches_panel(&mut self, frame: &mut Frame, area: Rect, theme: &Theme) {
         let items: Vec<ListItem> = self
             .branches
             .iter()
@@ -425,33 +426,33 @@ impl GitScreen {
                 let label = format!("{prefix}{}{upstream}", b.name);
                 let style = if b.is_current {
                     Style::default()
-                        .fg(Color::Green)
+                        .fg(theme.success)
                         .add_modifier(Modifier::BOLD)
                 } else {
-                    Style::default().fg(Color::White)
+                    Style::default().fg(theme.text)
                 };
                 ListItem::new(Line::from(Span::styled(label, style)))
             })
             .collect();
 
         let list = List::new(items)
-            .block(self.left_block("Branches"))
-            .highlight_style(Style::default().fg(Color::Black).bg(Color::White));
+            .block(self.left_block("Branches", theme))
+            .highlight_style(Style::default().fg(Color::Black).bg(theme.selection));
 
         frame.render_stateful_widget(list, area, &mut self.branches_list_state);
     }
 
-    fn draw_right_panel(&self, frame: &mut Frame, area: Rect) {
+    fn draw_right_panel(&self, frame: &mut Frame, area: Rect, theme: &Theme) {
         let title = match self.mode {
             GitMode::Files => "Diff (Working Tree)",
             GitMode::Commits => "Diff (Commit)",
             GitMode::Branches => "Branch Details",
         };
-        let block = self.right_block(title);
+        let block = self.right_block(title, theme);
 
         if self.diff_content.is_empty() {
             let text = Paragraph::new("Select an item to view diff")
-                .style(Style::default().fg(Color::DarkGray))
+                .style(Style::default().fg(theme.text_dim))
                 .block(block);
             frame.render_widget(text, area);
         } else {
@@ -460,11 +461,11 @@ impl GitScreen {
                 .lines()
                 .map(|line| {
                     let style = if line.starts_with('+') {
-                        Style::default().fg(Color::Green)
+                        Style::default().fg(theme.success)
                     } else if line.starts_with('-') {
-                        Style::default().fg(Color::Red)
+                        Style::default().fg(theme.danger)
                     } else if line.starts_with("@@") {
-                        Style::default().fg(Color::Cyan)
+                        Style::default().fg(theme.accent)
                     } else {
                         Style::default()
                     };

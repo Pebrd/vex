@@ -3,6 +3,7 @@ use crate::config::{self, Config};
 use crate::git;
 use crate::github::{Client, Comment, Issue, PullRequest};
 use crate::notes::{self, Note};
+use crate::theme;
 use crate::ui::dashboard::Dashboard;
 use crate::ui::file_browser::FileBrowser;
 use crate::ui::git::GitScreen;
@@ -32,7 +33,7 @@ use ratatui::Frame;
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph};
 use std::collections::HashMap;
@@ -176,6 +177,7 @@ pub struct App {
     detected_clis: Vec<String>,
     settings_selected: usize,
     pub git_screen: GitScreen,
+    pub theme: theme::Theme,
 }
 
 impl App {
@@ -221,6 +223,11 @@ impl App {
             .default_filter
             .clone()
             .unwrap_or_else(|| "open".to_string());
+
+        let theme = theme::parse_theme(
+            &config.theme,
+            &config.theme_overrides.clone().unwrap_or_default(),
+        );
 
         let detected_clis = Self::detect_clis();
         let settings_selected = config
@@ -272,6 +279,7 @@ impl App {
             available_labels: Vec::new(),
             detected_clis,
             settings_selected,
+            theme,
             git_screen: GitScreen::new(),
         };
 
@@ -522,7 +530,7 @@ impl App {
         if self.loading {
             let spinner = Paragraph::new(" Loading... ").style(
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(self.theme.accent)
                     .add_modifier(Modifier::BOLD),
             );
             frame.render_widget(spinner, layout[0]);
@@ -530,7 +538,7 @@ impl App {
         }
 
         match self.screen {
-            Screen::Dashboard => self.dashboard.draw(frame, layout[0]),
+            Screen::Dashboard => self.dashboard.draw(frame, layout[0], &self.theme),
             Screen::Issues => self.draw_issues(frame, layout[0]),
             Screen::PullRequests => {
                 let comments = self
@@ -542,15 +550,17 @@ impl App {
                     layout[0],
                     self.selected_pr.as_ref(),
                     comments.map(|v| v.as_slice()),
+                    &self.theme,
                 );
             }
-            Screen::Notes => self
-                .notes_view
-                .draw(frame, layout[0], self.selected_note.as_ref()),
-            Screen::Stats => self.stats_view.draw(frame, layout[0]),
-            Screen::Roadmap => self.roadmap_view.draw(frame, layout[0]),
+            Screen::Notes => {
+                self.notes_view
+                    .draw(frame, layout[0], self.selected_note.as_ref(), &self.theme)
+            }
+            Screen::Stats => self.stats_view.draw(frame, layout[0], &self.theme),
+            Screen::Roadmap => self.roadmap_view.draw(frame, layout[0], &self.theme),
             Screen::Settings => self.draw_settings(frame, layout[0]),
-            Screen::Git => self.git_screen.draw(frame, layout[0]),
+            Screen::Git => self.git_screen.draw(frame, layout[0], &self.theme),
         }
 
         let repo_info = self
@@ -575,17 +585,17 @@ impl App {
             InputMode::LinkNote { input } => format!("Link to issue #: {input}"),
             _ => format!("{}{}", self.status, fetch_info),
         };
-        status_bar(frame, layout[1], &status, repo_info.as_deref());
+        status_bar(frame, layout[1], &status, repo_info.as_deref(), &self.theme);
 
         let keys = self.status_keys();
         let keys_str = keys.join("  ");
-        crate::ui::keybinds_bar(frame, layout[2], &keys_str);
+        crate::ui::keybinds_bar(frame, layout[2], &keys_str, &self.theme);
 
         match &self.input_mode {
             InputMode::None => {}
             InputMode::Search { .. } => {}
             InputMode::BrowseProject { browser } | InputMode::EditProjectPath { browser, .. } => {
-                browser.draw(frame, frame.area());
+                browser.draw(frame, frame.area(), &self.theme);
             }
             InputMode::CreateNote { title, body, step } => {
                 let (prompt, value, help) = match step {
@@ -600,7 +610,7 @@ impl App {
                         "enter to submit, esc to skip",
                     ),
                 };
-                popup::input_dialog(frame, frame.area(), prompt, value, help);
+                popup::input_dialog(frame, frame.area(), prompt, value, help, &self.theme);
             }
             InputMode::Comment { body } => {
                 popup::input_dialog(
@@ -609,10 +619,11 @@ impl App {
                     "Comment",
                     body,
                     "enter to post, esc to cancel",
+                    &self.theme,
                 );
             }
             InputMode::ConfirmMerge { selected, .. } => {
-                popup::merge_dialog(frame, frame.area(), *selected as usize);
+                popup::merge_dialog(frame, frame.area(), *selected as usize, &self.theme);
             }
             InputMode::CreatePr { title, body, step } => {
                 let (prompt, value, help) = match step {
@@ -627,7 +638,7 @@ impl App {
                         "enter to submit, esc to skip body",
                     ),
                 };
-                popup::input_dialog(frame, frame.area(), prompt, value, help);
+                popup::input_dialog(frame, frame.area(), prompt, value, help, &self.theme);
             }
             InputMode::LinkNote { input } => {
                 popup::input_dialog(
@@ -636,6 +647,7 @@ impl App {
                     "Link note to issue #",
                     input,
                     "enter to link, esc to cancel",
+                    &self.theme,
                 );
             }
             InputMode::CreateRepo {
@@ -647,7 +659,7 @@ impl App {
                     0 => ("Repo name", "enter to confirm, esc to cancel"),
                     _ => ("", ""),
                 };
-                popup::input_dialog(frame, frame.area(), prompt, name, help);
+                popup::input_dialog(frame, frame.area(), prompt, name, help, &self.theme);
             }
             InputMode::EditIssue { .. } | InputMode::EditNote { .. } => {}
             InputMode::GitCommit { message } => {
@@ -663,13 +675,13 @@ impl App {
                     Line::from(""),
                     Line::from(Span::styled(
                         " [Enter] confirm  [Esc] cancel",
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(self.theme.text_dim),
                     )),
                 ];
                 let text = Paragraph::new(lines).block(
                     Block::default()
                         .borders(Borders::ALL)
-                        .border_style(Style::default().fg(Color::Cyan)),
+                        .border_style(Style::default().fg(self.theme.accent)),
                 );
                 frame.render_widget(text, modal_area);
             }
@@ -686,13 +698,13 @@ impl App {
                     Line::from(""),
                     Line::from(Span::styled(
                         " [y] Yes  [n] No",
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(self.theme.text_dim),
                     )),
                 ];
                 let text = Paragraph::new(lines).block(
                     Block::default()
                         .borders(Borders::ALL)
-                        .border_style(Style::default().fg(Color::Red)),
+                        .border_style(Style::default().fg(self.theme.danger)),
                 );
                 frame.render_widget(text, modal_area);
             }
@@ -711,7 +723,7 @@ impl App {
                 let is_selected = self.config.selected_cli.as_deref() == Some(cli.as_str());
                 let prefix = if is_selected { " ✓ " } else { "   " };
                 ListItem::new(Line::from(vec![
-                    Span::styled(prefix, Style::default().fg(Color::Green)),
+                    Span::styled(prefix, Style::default().fg(self.theme.success)),
                     Span::raw(cli),
                 ]))
             })
@@ -723,7 +735,7 @@ impl App {
         let list = List::new(items)
             .highlight_style(
                 Style::default()
-                    .bg(Color::DarkGray)
+                    .bg(self.theme.selection)
                     .add_modifier(Modifier::BOLD),
             )
             .highlight_symbol("> ")
@@ -731,7 +743,7 @@ impl App {
                 Block::default()
                     .borders(Borders::ALL)
                     .title(" Select CLI Tool ")
-                    .style(Style::default().fg(Color::Cyan)),
+                    .style(Style::default().fg(self.theme.accent)),
             );
 
         frame.render_stateful_widget(list, area, &mut list_state);
@@ -863,7 +875,7 @@ impl App {
             Line::from(Span::styled(
                 format!(" {:^width$} ", " Help ", width = width - 2),
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(self.theme.accent)
                     .add_modifier(Modifier::BOLD),
             )),
             Line::from(Span::raw("")),
@@ -875,12 +887,12 @@ impl App {
         lines.push(Line::from(Span::raw("")));
         lines.push(Line::from(Span::styled(
             " Press any key to close ",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(self.theme.text_dim),
         )));
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .style(Style::default().fg(Color::Cyan))
+            .style(Style::default().fg(self.theme.accent))
             .title(" Keybindings ");
         let para = Paragraph::new(lines).block(block);
         let area = centered_rect(60, 50, frame.area());
@@ -944,6 +956,7 @@ impl App {
             self.focus,
             editing.as_ref(),
             self.detail_scroll,
+            &self.theme,
         );
     }
 
