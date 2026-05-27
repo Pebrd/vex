@@ -24,6 +24,7 @@ dirs = "6.0.0"
 anyhow = "1.0.102"
 fuzzy-matcher = "0.3.7"
 webbrowser = "1.0.0"
+git2 = { version = "0.19", features = ["vendored-libgit2"] }
 
 [profile.release]
 opt-level = 3
