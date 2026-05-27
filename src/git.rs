@@ -212,9 +212,9 @@ pub fn stage_file(repo: &Repository, path: &str) -> Result<()> {
 
 #[allow(dead_code)]
 pub fn unstage_file(repo: &Repository, path: &str) -> Result<()> {
-    let mut index = repo.index()?;
-    index.remove_path(Path::new(path))?;
-    index.write()?;
+    let head_tree = repo.head()?.peel_to_tree()?;
+    let obj = repo.find_object(head_tree.id(), None)?;
+    repo.reset_default(Some(&obj), [path])?;
     Ok(())
 }
 
@@ -467,6 +467,8 @@ pub fn pull(repo: &Repository) -> Result<()> {
             &merged_tree,
             &[&head_commit, &remote_commit],
         )?;
+        merged.write()?;
+        repo.checkout_head(Some(&mut git2::build::CheckoutBuilder::new().force()))?;
     }
     Ok(())
 }
