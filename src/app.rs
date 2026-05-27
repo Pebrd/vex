@@ -445,6 +445,49 @@ impl App {
         }
     }
 
+    fn status_keys(&self) -> Vec<&str> {
+        match self.screen {
+            Screen::Dashboard => {
+                vec!["j/k navigate", "a add project", "e edit path", "q back"]
+            }
+            Screen::Issues => match &self.input_mode {
+                InputMode::Search { .. } => vec!["type to search", "Esc cancel"],
+                InputMode::Comment { .. } => vec!["type comment", "Esc cancel"],
+                InputMode::EditIssue { .. } | InputMode::EditNote { .. } => {
+                    vec!["Tab switch field", "Enter save", "Esc cancel"]
+                }
+                _ => vec![
+                    "j/k navigate",
+                    "c create",
+                    "e edit",
+                    "x toggle",
+                    "o comment",
+                    "f filter",
+                    "/ search",
+                    "q back",
+                ],
+            },
+            Screen::PullRequests => vec![
+                "j/k navigate",
+                "c create PR",
+                "m merge",
+                "/ search",
+                "q back",
+            ],
+            Screen::Notes => vec![
+                "j/k navigate",
+                "n new",
+                "d delete",
+                "L link issue",
+                "/ search",
+                "q back",
+            ],
+            Screen::Stats => vec!["q back"],
+            Screen::Roadmap => vec!["q back"],
+            Screen::Settings => vec!["j/k select", "Enter choose", "q back"],
+        }
+    }
+
     fn draw(&mut self, frame: &mut Frame) {
         let layout = Layout::default()
             .direction(Direction::Vertical)
@@ -514,23 +557,9 @@ impl App {
         };
         status_bar(frame, layout[1], &status, repo_info.as_deref());
 
-        let (screen_str, input_str) = match &self.input_mode {
-            InputMode::None => (
-                match self.screen {
-                    Screen::Dashboard => "dashboard",
-                    Screen::Issues => "issues",
-                    Screen::PullRequests => "prs",
-                    Screen::Notes => "notes",
-                    Screen::Stats => "stats",
-                    Screen::Roadmap => "roadmap",
-                    Screen::Settings => "settings",
-                },
-                "none",
-            ),
-            InputMode::EditIssue { .. } | InputMode::EditNote { .. } => ("issues", "edit"),
-            _ => ("", ""),
-        };
-        crate::ui::keybinds_bar(frame, layout[2], screen_str, input_str);
+        let keys = self.status_keys();
+        let keys_str = keys.join("  ");
+        crate::ui::keybinds_bar(frame, layout[2], &keys_str);
 
         match &self.input_mode {
             InputMode::None => {}

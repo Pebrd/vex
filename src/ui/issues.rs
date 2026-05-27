@@ -505,7 +505,10 @@ impl IssuesView {
             }
         }
 
-        let detail = Paragraph::new(lines).block(block).scroll((scroll, 0));
+        let detail = Paragraph::new(lines)
+            .block(block)
+            .wrap(Wrap { trim: false })
+            .scroll((scroll, 0));
         frame.render_widget(detail, area);
     }
 
@@ -557,7 +560,10 @@ impl IssuesView {
             }
         }
 
-        let detail = Paragraph::new(lines).block(block).scroll((scroll, 0));
+        let detail = Paragraph::new(lines)
+            .block(block)
+            .wrap(Wrap { trim: false })
+            .scroll((scroll, 0));
         frame.render_widget(detail, area);
     }
 }

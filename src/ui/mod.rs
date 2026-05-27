@@ -13,30 +13,12 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
 
-pub fn keybinds_bar(frame: &mut Frame, area: Rect, screen: &str, input_mode: &str) {
-    let binds = match (screen, input_mode) {
-        ("dashboard", _) => {
-            " [a]dd  [enter] open  [d]elete  [Ctrl+o] explorer  [Ctrl+t] terminal  [Ctrl+e] CLI  [Ctrl+g] settings  [?] help  [q]uit"
-        }
-        ("issues", "none") => {
-            " [j/k] nav  [/] search  [O] browser  [Ctrl+o] explorer  [Ctrl+g] settings  [?] help  [q] back"
-        }
-        ("issues", "edit") => " [Tab] field  [Ctrl+S] save  [Esc] cancel",
-        ("prs", "none") => {
-            " [j/k] nav  [enter] detail  [O] browser  [Ctrl+o] explorer  [Ctrl+g] settings  [?] help  [q] back"
-        }
-        ("notes", "none") => " [j/k] nav  [/] search  [Ctrl+g] settings  [?] help  [q] back",
-        ("stats", _) | ("roadmap", _) => {
-            " [Ctrl+o] explorer  [Ctrl+g] settings  [?] help  [q] back"
-        }
-        ("settings", _) => " [j/k] nav  [Enter] select  [Esc/q] back",
-        _ => "",
-    };
+pub fn keybinds_bar(frame: &mut Frame, area: Rect, keys: &str) {
     let style = Style::default()
         .bg(Color::DarkGray)
         .fg(Color::White)
         .add_modifier(Modifier::BOLD);
-    let msg = Paragraph::new(Line::from(Span::styled(binds, style)));
+    let msg = Paragraph::new(Line::from(Span::styled(keys, style)));
     frame.render_widget(msg, area);
 }
 
