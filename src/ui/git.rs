@@ -6,6 +6,7 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
+use std::collections::HashSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -15,6 +16,44 @@ pub enum GitMode {
     Files,
     Commits,
     Branches,
+}
+
+#[derive(Clone, Default)]
+pub struct MultiSelect {
+    pub active: bool,
+    pub selected: HashSet<usize>,
+}
+
+impl MultiSelect {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[allow(dead_code)]
+    pub fn toggle(&mut self) {
+        self.active = !self.active;
+    }
+
+    pub fn is_selected(&self, idx: usize) -> bool {
+        self.selected.contains(&idx)
+    }
+
+    pub fn toggle_item(&mut self, idx: usize) {
+        if !self.selected.insert(idx) {
+            self.selected.remove(&idx);
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.selected.clear();
+        self.active = false;
+    }
+
+    pub fn selected_indices(&self) -> Vec<usize> {
+        let mut v: Vec<_> = self.selected.iter().copied().collect();
+        v.sort();
+        v
+    }
 }
 
 #[allow(dead_code)]
@@ -32,6 +71,7 @@ pub struct GitScreen {
     pub current_branch: String,
     pub loading: bool,
     pub status: String,
+    pub multi_select: MultiSelect,
 }
 
 #[allow(dead_code)]
@@ -51,6 +91,7 @@ impl GitScreen {
             current_branch: String::new(),
             loading: false,
             status: String::new(),
+            multi_select: MultiSelect::new(),
         }
     }
 
@@ -298,6 +339,74 @@ impl GitScreen {
             Err(e) => self.status = format!("error: {e}"),
         }
     }
+
+    pub fn toggle_multi_select(&mut self) {
+        if self.multi_select.active {
+            self.multi_select.clear();
+        } else {
+            self.multi_select.active = true;
+            self.status = "multi-select: space to toggle, V to clear, t to stage/unstage selected"
+                .to_string();
+        }
+    }
+
+    pub fn stage_unstage_multi(&mut self) {
+        let repo_path = match &self.repo_path {
+            Some(p) => p.clone(),
+            None => return,
+        };
+        let indices = self.multi_select.selected_indices();
+        if indices.is_empty() {
+            return;
+        }
+        match git::open_repo(&repo_path) {
+            Ok(repo) => {
+                for idx in indices {
+                    if let Some(file) = self.files.get(idx) {
+                        if file.staged {
+                            let _ = git::unstage_file(&repo, &file.path);
+                        } else {
+                            let _ = git::stage_file(&repo, &file.path);
+                        }
+                    }
+                }
+                self.multi_select.clear();
+                self.refresh_files(&repo_path);
+            }
+            Err(e) => self.status = format!("error: {e}"),
+        }
+    }
+
+    pub fn delete_branches_multi(&mut self) {
+        let repo_path = match &self.repo_path {
+            Some(p) => p.clone(),
+            None => return,
+        };
+        let indices = self.multi_select.selected_indices();
+        if indices.is_empty() {
+            return;
+        }
+        match git::open_repo(&repo_path) {
+            Ok(repo) => {
+                let mut deleted = 0u32;
+                for idx in indices {
+                    if let Some(branch) = self.branches.get(idx) {
+                        if !branch.is_current {
+                            if git::delete_branch(&repo, &branch.name).is_ok() {
+                                deleted += 1;
+                            }
+                        }
+                    }
+                }
+                self.multi_select.clear();
+                self.refresh_branches(&repo_path);
+                if deleted > 0 {
+                    self.status = format!("deleted {deleted} branch(es)");
+                }
+            }
+            Err(e) => self.status = format!("error: {e}"),
+        }
+    }
 }
 
 // -- draw / render methods --
@@ -347,7 +456,8 @@ impl GitScreen {
         let items: Vec<ListItem> = self
             .files
             .iter()
-            .map(|f| {
+            .enumerate()
+            .map(|(i, f)| {
                 let (symbol, style) = if f.is_untracked {
                     ("[+]", Style::default().fg(theme.success))
                 } else if f.staged {
@@ -369,9 +479,22 @@ impl GitScreen {
                         _ => ("[?]", Style::default().fg(theme.warning)),
                     }
                 };
+                let multi_prefix = if self.multi_select.active {
+                    if self.multi_select.is_selected(i) {
+                        "● "
+                    } else {
+                        "○ "
+                    }
+                } else {
+                    ""
+                };
+                let mut item_style = style;
+                if self.multi_select.active && self.multi_select.is_selected(i) {
+                    item_style = item_style.bg(theme.selection);
+                }
                 ListItem::new(Line::from(Span::styled(
-                    format!("{symbol} {}", f.path),
-                    style,
+                    format!("{multi_prefix}{symbol} {}", f.path),
+                    item_style,
                 )))
             })
             .collect();
@@ -416,21 +539,34 @@ impl GitScreen {
         let items: Vec<ListItem> = self
             .branches
             .iter()
-            .map(|b| {
+            .enumerate()
+            .map(|(i, b)| {
                 let prefix = if b.is_current { "* " } else { "  " };
                 let upstream = b
                     .upstream
                     .as_ref()
                     .map(|u| format!(" → {u}"))
                     .unwrap_or_default();
-                let label = format!("{prefix}{}{upstream}", b.name);
-                let style = if b.is_current {
+                let multi_prefix = if self.multi_select.active {
+                    if self.multi_select.is_selected(i) {
+                        "● "
+                    } else {
+                        "○ "
+                    }
+                } else {
+                    ""
+                };
+                let label = format!("{multi_prefix}{prefix}{}{upstream}", b.name);
+                let mut style = if b.is_current {
                     Style::default()
                         .fg(theme.success)
                         .add_modifier(Modifier::BOLD)
                 } else {
                     Style::default().fg(theme.text)
                 };
+                if self.multi_select.active && self.multi_select.is_selected(i) {
+                    style = style.bg(theme.selection);
+                }
                 ListItem::new(Line::from(Span::styled(label, style)))
             })
             .collect();
@@ -547,31 +683,57 @@ impl GitScreen {
 #[allow(dead_code)]
 impl GitScreen {
     pub fn status_keys(&self) -> Vec<&str> {
-        match self.mode {
-            GitMode::Files => vec![
-                "j/k navigate",
-                "space stage/unstage",
-                "t toggle all",
-                "s commit",
-                "d discard",
-                "enter diff",
-                "1-3 switch mode",
-                "q back",
-            ],
-            GitMode::Commits => vec![
-                "j/k navigate",
-                "enter view diff",
-                "1-3 switch mode",
-                "q back",
-            ],
-            GitMode::Branches => vec![
-                "j/k navigate",
-                "enter checkout",
-                "n new branch",
-                "d delete",
-                "1-3 switch mode",
-                "q back",
-            ],
+        if self.multi_select.active {
+            match self.mode {
+                GitMode::Files => vec![
+                    "j/k navigate",
+                    "space toggle item",
+                    "t stage/unstage selected",
+                    "V exit multi-select",
+                    "q back",
+                ],
+                GitMode::Commits => vec![
+                    "j/k navigate",
+                    "enter view diff",
+                    "1-3 switch mode",
+                    "q back",
+                ],
+                GitMode::Branches => vec![
+                    "j/k navigate",
+                    "space toggle item",
+                    "d delete selected",
+                    "V exit multi-select",
+                    "q back",
+                ],
+            }
+        } else {
+            match self.mode {
+                GitMode::Files => vec![
+                    "j/k navigate",
+                    "space stage/unstage",
+                    "t toggle all",
+                    "s commit",
+                    "d discard",
+                    "enter diff",
+                    "1-3 switch mode",
+                    "q back",
+                ],
+                GitMode::Commits => vec![
+                    "j/k navigate",
+                    "enter view diff",
+                    "1-3 switch mode",
+                    "q back",
+                ],
+                GitMode::Branches => vec![
+                    "j/k navigate",
+                    "enter checkout",
+                    "n new branch",
+                    "d delete",
+                    "V multi-select",
+                    "1-3 switch mode",
+                    "q back",
+                ],
+            }
         }
     }
 

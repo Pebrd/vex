@@ -7,6 +7,7 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
+use std::collections::HashSet;
 
 pub struct IssuesView {
     pub issues: Vec<Issue>,
@@ -15,8 +16,46 @@ pub struct IssuesView {
     pub filter_state: Option<String>,
     #[allow(dead_code)]
     pub filter_label: Option<String>,
+    pub issues_multi: MultiSelect,
     list_state: ListState,
     notes_list_state: ListState,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct MultiSelect {
+    pub active: bool,
+    pub selected: HashSet<usize>,
+}
+
+impl MultiSelect {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn toggle(&mut self) {
+        self.active = !self.active;
+    }
+
+    pub fn is_selected(&self, idx: usize) -> bool {
+        self.selected.contains(&idx)
+    }
+
+    pub fn toggle_item(&mut self, idx: usize) {
+        if !self.selected.insert(idx) {
+            self.selected.remove(&idx);
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.selected.clear();
+        self.active = false;
+    }
+
+    pub fn selected_indices(&self) -> Vec<usize> {
+        let mut v: Vec<_> = self.selected.iter().copied().collect();
+        v.sort();
+        v
+    }
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -48,6 +87,7 @@ impl IssuesView {
             selected: 0,
             filter_state: None,
             filter_label: None,
+            issues_multi: MultiSelect::new(),
             list_state,
             notes_list_state,
         }
@@ -120,7 +160,8 @@ impl IssuesView {
         let items: Vec<ListItem> = self
             .issues
             .iter()
-            .map(|i| {
+            .enumerate()
+            .map(|(idx, i)| {
                 let state_style = match i.state.as_str() {
                     "open" => Style::default().fg(theme.success),
                     "closed" => Style::default().fg(theme.danger),
@@ -147,7 +188,21 @@ impl IssuesView {
                     }
                 }
 
-                ListItem::new(Line::from(spans))
+                if self.issues_multi.active {
+                    let marker = if self.issues_multi.is_selected(idx) {
+                        "● "
+                    } else {
+                        "○ "
+                    };
+                    spans.insert(0, Span::styled(marker, Style::default().fg(theme.accent)));
+                }
+
+                let mut line = Line::from(spans);
+                if self.issues_multi.active && self.issues_multi.is_selected(idx) {
+                    line = line.style(Style::default().bg(theme.selection));
+                }
+
+                ListItem::new(line)
             })
             .collect();
 
@@ -586,5 +641,55 @@ impl IssuesView {
             .wrap(Wrap { trim: false })
             .scroll((scroll, 0));
         frame.render_widget(detail, area);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn multi_select_new_is_inactive_and_empty() {
+        let ms = MultiSelect::new();
+        assert!(!ms.active);
+        assert!(ms.selected.is_empty());
+    }
+
+    #[test]
+    fn multi_select_toggle_activates_and_deactivates() {
+        let mut ms = MultiSelect::new();
+        ms.toggle();
+        assert!(ms.active);
+        ms.toggle();
+        assert!(!ms.active);
+    }
+
+    #[test]
+    fn multi_select_toggle_item_adds_and_removes() {
+        let mut ms = MultiSelect::new();
+        ms.toggle_item(5);
+        assert!(ms.is_selected(5));
+        ms.toggle_item(5);
+        assert!(!ms.is_selected(5));
+    }
+
+    #[test]
+    fn multi_select_clear_resets_all() {
+        let mut ms = MultiSelect::new();
+        ms.toggle();
+        ms.toggle_item(3);
+        ms.toggle_item(7);
+        ms.clear();
+        assert!(!ms.active);
+        assert!(ms.selected.is_empty());
+    }
+
+    #[test]
+    fn multi_select_selected_indices_are_sorted() {
+        let mut ms = MultiSelect::new();
+        ms.toggle_item(9);
+        ms.toggle_item(3);
+        ms.toggle_item(7);
+        assert_eq!(ms.selected_indices(), vec![3, 7, 9]);
     }
 }

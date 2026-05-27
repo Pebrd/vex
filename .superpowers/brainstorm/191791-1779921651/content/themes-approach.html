@@ -1,0 +1,30 @@
+<h2>Enfoque para Temas / Colores</h2>
+<p class="subtitle">Dos grandes decisiones de diseño. Empecemos con la primera.</p>
+
+<div class="section">
+  <h3>1. ¿Cómo se configura el tema?</h3>
+  <div class="options">
+    <div class="option" data-choice="toml" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>TOML en config.toml</h3>
+        <p>Paleta completa en <code>~/.config/vex/config.toml</code>. Sección opcional <code>[theme]</code> con colores en hex o nombre. Fácil de editar, versionable, sin estado extra.</p>
+        <div class="pros-cons" style="margin-top:8px;">
+          <div class="pros"><h4>Pros</h4><ul><li>Un solo archivo de config</li><li>Auto-documentado</li></ul></div>
+          <div class="cons"><h4>Contras</h4><ul><li>Cambiar tema requiere editar a mano</li></ul></div>
+        </div>
+      </div>
+    </div>
+    <div class="option" data-choice="presets" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>Presets nombrados + TOML</h3>
+        <p>Temas predefinidos (catppuccin, gruvbox, dracula, nord, solarized) seleccionables con <code>theme = "catppuccin"</code> en config, más opción de sobreescribir colores individuales. Similar a cómo funciona en lazygit, fish, etc.</p>
+        <div class="pros-cons" style="margin-top:8px;">
+          <div class="pros"><h4>Pros</h4><ul><li>Cambio instantáneo con una línea</li><li>Paletas probadas por la comunidad</li></ul></div>
+          <div class="cons"><h4>Contras</h4><ul><li>Más códigos</li><li>Decisiones de color por nosotros</li></ul></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

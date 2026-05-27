@@ -394,6 +394,7 @@ impl App {
     }
 
     fn go_to_dashboard(&mut self) {
+        self.issues_view.issues_multi.clear();
         self.repo_owner = None;
         self.repo_name = None;
         self.repo_path = None;
@@ -476,23 +477,36 @@ impl App {
             Screen::Dashboard => {
                 vec!["j/k navigate", "a add project", "e edit path", "q back"]
             }
-            Screen::Issues => match &self.input_mode {
-                InputMode::Search { .. } => vec!["type to search", "Esc cancel"],
-                InputMode::Comment { .. } => vec!["type comment", "Esc cancel"],
-                InputMode::EditIssue { .. } | InputMode::EditNote { .. } => {
-                    vec!["Tab switch field", "Enter save", "Esc cancel"]
+            Screen::Issues => {
+                if self.issues_view.issues_multi.active {
+                    vec![
+                        "V           exit multi",
+                        "space       toggle",
+                        "c           close",
+                        "r           reopen",
+                        "j/k navigate",
+                        "q back",
+                    ]
+                } else {
+                    match &self.input_mode {
+                        InputMode::Search { .. } => vec!["type to search", "Esc cancel"],
+                        InputMode::Comment { .. } => vec!["type comment", "Esc cancel"],
+                        InputMode::EditIssue { .. } | InputMode::EditNote { .. } => {
+                            vec!["Tab switch field", "Enter save", "Esc cancel"]
+                        }
+                        _ => vec![
+                            "j/k navigate",
+                            "c create",
+                            "e edit",
+                            "x toggle",
+                            "o comment",
+                            "f filter",
+                            "/ search",
+                            "q back",
+                        ],
+                    }
                 }
-                _ => vec![
-                    "j/k navigate",
-                    "c create",
-                    "e edit",
-                    "x toggle",
-                    "o comment",
-                    "f filter",
-                    "/ search",
-                    "q back",
-                ],
-            },
+            }
             Screen::PullRequests => vec![
                 "j/k navigate",
                 "c create PR",
@@ -2076,32 +2090,70 @@ impl App {
                 }
             },
             KeyCode::Char('/') => {
+                self.issues_view.issues_multi.clear();
                 self.input_mode = InputMode::Search {
                     query: String::new(),
                 };
             }
             KeyCode::Char('c') => {
-                let labels = if self.repo_owner.is_some() && self.repo_name.is_some() {
-                    self.client
-                        .list_labels(
-                            self.repo_owner.as_deref().unwrap(),
-                            self.repo_name.as_deref().unwrap(),
-                        )
-                        .await
-                        .unwrap_or_default()
+                if self.issues_view.issues_multi.active {
+                    // close selected issues
+                    let indices: Vec<usize> = self.issues_view.issues_multi.selected_indices();
+                    if indices.is_empty() {
+                        self.status = "no issues selected".to_string();
+                    } else {
+                        for &idx in &indices {
+                            if let Some(issue) = self.issues_view.issues.get(idx) {
+                                let num = issue.number;
+                                // Optimistic local update
+                                for i in self.issues_view.issues.iter_mut() {
+                                    if i.number == num {
+                                        i.state = "closed".to_string();
+                                    }
+                                }
+                                for i in self.all_issues.iter_mut() {
+                                    if i.number == num {
+                                        i.state = "closed".to_string();
+                                    }
+                                }
+                                if let (Some(owner), Some(repo)) =
+                                    (&self.repo_owner, &self.repo_name)
+                                {
+                                    self.status = format!("closing issue #{num}...");
+                                    let _ = self
+                                        .client
+                                        .update_issue_state(owner, repo, num, "closed")
+                                        .await;
+                                }
+                            }
+                        }
+                        self.issues_view.issues_multi.clear();
+                        self.status = "selected issues closed, refreshing...".to_string();
+                        self.refresh_issues().await?;
+                    }
                 } else {
-                    Vec::new()
-                };
-                self.input_mode = InputMode::EditIssue {
-                    title: String::new(),
-                    body: String::new(),
-                    focus: 0,
-                    issue_number: 0,
-                    labels: Vec::new(),
-                    available_labels: labels,
-                    label_idx: 0,
-                };
-                self.status = "creating issue (Tab switch, Ctrl+S save)".to_string();
+                    let labels = if self.repo_owner.is_some() && self.repo_name.is_some() {
+                        self.client
+                            .list_labels(
+                                self.repo_owner.as_deref().unwrap(),
+                                self.repo_name.as_deref().unwrap(),
+                            )
+                            .await
+                            .unwrap_or_default()
+                    } else {
+                        Vec::new()
+                    };
+                    self.input_mode = InputMode::EditIssue {
+                        title: String::new(),
+                        body: String::new(),
+                        focus: 0,
+                        issue_number: 0,
+                        labels: Vec::new(),
+                        available_labels: labels,
+                        label_idx: 0,
+                    };
+                    self.status = "creating issue (Tab switch, Ctrl+S save)".to_string();
+                }
             }
             KeyCode::Char('x') => match self.focus {
                 FocusTarget::Issues => {
@@ -2197,6 +2249,7 @@ impl App {
                 self.show_roadmap().await?;
             }
             KeyCode::Char('f') => {
+                self.issues_view.issues_multi.clear();
                 self.state_filter = match self.state_filter.as_str() {
                     "open" => "all".to_string(),
                     "all" => "closed".to_string(),
@@ -2208,6 +2261,7 @@ impl App {
                 self.refresh_issues().await?;
             }
             KeyCode::Char('l') => {
+                self.issues_view.issues_multi.clear();
                 if self.available_labels.is_empty() {
                     if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
                         self.available_labels = self
@@ -2247,6 +2301,7 @@ impl App {
                 }
             }
             KeyCode::Char('S') => {
+                self.issues_view.issues_multi.clear();
                 self.sort_mode = match self.sort_mode {
                     SortMode::CreatedNewest => {
                         self.status = "sort: created (oldest)".to_string();
@@ -2273,7 +2328,63 @@ impl App {
                 self.mark_dirty();
             }
             KeyCode::Char('r') => {
-                self.refresh_issues().await?;
+                if self.issues_view.issues_multi.active {
+                    // reopen selected issues
+                    let indices: Vec<usize> = self.issues_view.issues_multi.selected_indices();
+                    if indices.is_empty() {
+                        self.status = "no issues selected".to_string();
+                    } else {
+                        for &idx in &indices {
+                            if let Some(issue) = self.issues_view.issues.get(idx) {
+                                let num = issue.number;
+                                // Optimistic local update
+                                for i in self.issues_view.issues.iter_mut() {
+                                    if i.number == num {
+                                        i.state = "open".to_string();
+                                    }
+                                }
+                                for i in self.all_issues.iter_mut() {
+                                    if i.number == num {
+                                        i.state = "open".to_string();
+                                    }
+                                }
+                                if let (Some(owner), Some(repo)) =
+                                    (&self.repo_owner, &self.repo_name)
+                                {
+                                    self.status = format!("reopening issue #{num}...");
+                                    let _ = self
+                                        .client
+                                        .update_issue_state(owner, repo, num, "open")
+                                        .await;
+                                }
+                            }
+                        }
+                        self.issues_view.issues_multi.clear();
+                        self.status = "selected issues reopened, refreshing...".to_string();
+                        self.refresh_issues().await?;
+                    }
+                } else {
+                    self.refresh_issues().await?;
+                }
+            }
+            KeyCode::Char(' ') => {
+                if self.issues_view.issues_multi.active && self.focus == FocusTarget::Issues {
+                    self.issues_view
+                        .issues_multi
+                        .toggle_item(self.issues_view.selected);
+                    self.mark_dirty();
+                }
+            }
+            KeyCode::Char('V') => {
+                if self.issues_view.issues_multi.active {
+                    self.issues_view.issues_multi.clear();
+                    self.status = "exited multi-select".to_string();
+                } else {
+                    self.issues_view.issues_multi.toggle();
+                    self.status =
+                        "multi-select: space to toggle, c to close, r to reopen".to_string();
+                }
+                self.mark_dirty();
             }
             _ => {}
         }
@@ -3406,12 +3517,14 @@ impl App {
         };
 
         if query.is_empty() {
+            self.issues_view.issues_multi.clear();
             self.restore_filter();
             return;
         }
 
         match self.screen {
             Screen::Issues => {
+                self.issues_view.issues_multi.clear();
                 let filtered: Vec<Issue> = self
                     .all_issues
                     .iter()
@@ -3467,6 +3580,7 @@ impl App {
     }
 
     fn restore_filter(&mut self) {
+        self.issues_view.issues_multi.clear();
         self.issues_view.issues = self.all_issues.clone();
         self.prs_view.prs = self.all_prs.clone();
         self.issues_view.selected = self
@@ -3493,6 +3607,7 @@ impl App {
     // --- Screen switching ---
 
     async fn switch_to_issues(&mut self) -> Result<()> {
+        self.issues_view.issues_multi.clear();
         if self.repo_owner.is_some() && self.repo_name.is_some() {
             self.loading = true;
             self.all_issues.clear();
@@ -3508,6 +3623,7 @@ impl App {
     }
 
     async fn switch_to_prs(&mut self) -> Result<()> {
+        self.issues_view.issues_multi.clear();
         if self.repo_owner.is_some() && self.repo_name.is_some() {
             self.loading = true;
             self.all_prs.clear();
@@ -3604,6 +3720,7 @@ impl App {
     }
 
     async fn show_stats(&mut self) -> Result<()> {
+        self.issues_view.issues_multi.clear();
         if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
             self.stats_view = StatsView::new(owner, repo);
             self.stats_view.update(&self.all_issues, &self.all_prs);
@@ -3613,6 +3730,7 @@ impl App {
     }
 
     async fn show_roadmap(&mut self) -> Result<()> {
+        self.issues_view.issues_multi.clear();
         if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
             self.roadmap_view = RoadmapView::new(owner, repo);
             self.roadmap_view.update(&self.all_issues);
@@ -3754,6 +3872,27 @@ impl App {
                 self.git_screen.set_mode(crate::ui::git::GitMode::Branches);
                 self.mark_dirty();
             }
+            KeyCode::Char('V') => {
+                self.git_screen.toggle_multi_select();
+                self.status = self.git_screen.status.clone();
+                self.mark_dirty();
+            }
+            KeyCode::Char(' ') if self.git_screen.multi_select.active && self.git_screen.focus => {
+                match self.git_screen.mode {
+                    crate::ui::git::GitMode::Files => {
+                        if let Some(idx) = self.git_screen.files_list_state.selected() {
+                            self.git_screen.multi_select.toggle_item(idx);
+                        }
+                    }
+                    crate::ui::git::GitMode::Branches => {
+                        if let Some(idx) = self.git_screen.branches_list_state.selected() {
+                            self.git_screen.multi_select.toggle_item(idx);
+                        }
+                    }
+                    _ => {}
+                }
+                self.mark_dirty();
+            }
             KeyCode::Char(' ') if self.git_screen.mode == crate::ui::git::GitMode::Files => {
                 if self.git_screen.focus {
                     let idx = self.git_screen.files_list_state.selected();
@@ -3765,6 +3904,14 @@ impl App {
                         }
                     }
                 }
+                self.mark_dirty();
+            }
+            KeyCode::Char('t')
+                if self.git_screen.multi_select.active
+                    && self.git_screen.mode == crate::ui::git::GitMode::Files =>
+            {
+                self.git_screen.stage_unstage_multi();
+                self.status = self.git_screen.status.clone();
                 self.mark_dirty();
             }
             KeyCode::Char('t') if self.git_screen.mode == crate::ui::git::GitMode::Files => {
@@ -3791,6 +3938,14 @@ impl App {
                         };
                     }
                 }
+                self.mark_dirty();
+            }
+            KeyCode::Char('d')
+                if self.git_screen.multi_select.active
+                    && self.git_screen.mode == crate::ui::git::GitMode::Branches =>
+            {
+                self.git_screen.delete_branches_multi();
+                self.status = self.git_screen.status.clone();
                 self.mark_dirty();
             }
             KeyCode::Char('d') if self.git_screen.mode == crate::ui::git::GitMode::Branches => {
