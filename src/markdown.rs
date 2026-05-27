@@ -17,6 +17,9 @@ pub fn render_markdown(text: &str, theme: &Theme) -> Vec<Line<'static>> {
             lines.push(Line::from(""));
         }
     };
+    let mut in_task_item = false;
+    let mut link_text: Vec<String> = Vec::new();
+    let mut in_link = false;
 
     for event in parser {
         match event {
@@ -38,10 +41,12 @@ pub fn render_markdown(text: &str, theme: &Theme) -> Vec<Line<'static>> {
                     if !current_line.is_empty() {
                         flush_line(&mut lines, &mut current_line);
                     }
-                    current_line.push(Span::styled(
-                        format!("  {} ", "•"),
-                        Style::default().fg(theme.accent),
-                    ));
+                    if !in_task_item {
+                        current_line.push(Span::styled(
+                            format!("  {} ", "•"),
+                            Style::default().fg(theme.accent),
+                        ));
+                    }
                 }
                 Tag::BlockQuote(_) => {
                     lines.push(Line::from(""));
@@ -59,14 +64,12 @@ pub fn render_markdown(text: &str, theme: &Theme) -> Vec<Line<'static>> {
                 }
                 Tag::Link {
                     link_type: _,
-                    dest_url,
+                    dest_url: _,
                     title: _,
                     id: _,
                 } => {
-                    current_line.push(Span::styled(
-                        dest_url.to_string(),
-                        Style::default().fg(theme.accent).underlined(),
-                    ));
+                    in_link = true;
+                    link_text.clear();
                 }
                 Tag::Image { .. } => {
                     current_line.push(Span::styled(
@@ -74,7 +77,14 @@ pub fn render_markdown(text: &str, theme: &Theme) -> Vec<Line<'static>> {
                         Style::default().fg(theme.text_dim).italic(),
                     ));
                 }
-                _ => {}
+                Tag::HtmlBlock => {}
+                Tag::FootnoteDefinition(_) => {}
+                Tag::DefinitionList => {}
+                Tag::DefinitionListTitle => {}
+                Tag::DefinitionListDefinition => {}
+                Tag::Superscript => {}
+                Tag::Subscript => {}
+                Tag::MetadataBlock(_) => {}
             },
             Event::End(tag_end) => match tag_end {
                 TagEnd::Paragraph => {
@@ -87,10 +97,12 @@ pub fn render_markdown(text: &str, theme: &Theme) -> Vec<Line<'static>> {
                 TagEnd::CodeBlock => {
                     if in_code_block {
                         in_code_block = false;
-                        lines.push(Line::from(Span::styled(
-                            code_block_lines.join("\n"),
-                            Style::default().fg(theme.warning).bg(theme.surface),
-                        )));
+                        for line_text in &code_block_lines {
+                            lines.push(Line::from(Span::styled(
+                                line_text.clone(),
+                                Style::default().fg(theme.warning).bg(theme.surface),
+                            )));
+                        }
                         code_block_lines.clear();
                         lines.push(Line::from(""));
                     }
@@ -100,6 +112,7 @@ pub fn render_markdown(text: &str, theme: &Theme) -> Vec<Line<'static>> {
                 }
                 TagEnd::Item => {
                     flush_line(&mut lines, &mut current_line);
+                    in_task_item = false;
                 }
                 TagEnd::BlockQuote(_) => {}
                 TagEnd::Table => {}
@@ -113,13 +126,31 @@ pub fn render_markdown(text: &str, theme: &Theme) -> Vec<Line<'static>> {
                 TagEnd::Strong => {
                     in_bold = false;
                 }
-                TagEnd::Link => {}
+                TagEnd::Link => {
+                    if in_link {
+                        let text = link_text.join("");
+                        current_line.push(Span::styled(
+                            text,
+                            Style::default().fg(theme.accent).underlined(),
+                        ));
+                        in_link = false;
+                    }
+                }
                 TagEnd::Image => {}
-                _ => {}
+                TagEnd::HtmlBlock => {}
+                TagEnd::FootnoteDefinition => {}
+                TagEnd::DefinitionList => {}
+                TagEnd::DefinitionListTitle => {}
+                TagEnd::DefinitionListDefinition => {}
+                TagEnd::Superscript => {}
+                TagEnd::Subscript => {}
+                TagEnd::MetadataBlock(_) => {}
             },
             Event::Text(t) => {
                 let text = t.to_string();
-                if in_code_block {
+                if in_link {
+                    link_text.push(text);
+                } else if in_code_block {
                     code_block_lines.push(text);
                 } else {
                     let mut s = Style::default().fg(theme.text);
@@ -172,6 +203,7 @@ pub fn render_markdown(text: &str, theme: &Theme) -> Vec<Line<'static>> {
                 current_line.push(Span::raw(html.to_string()));
             }
             Event::TaskListMarker(checked) => {
+                in_task_item = true;
                 let marker = if checked { "[x]" } else { "[ ]" };
                 current_line.push(Span::styled(marker, Style::default().fg(theme.accent)));
             }
@@ -181,7 +213,6 @@ pub fn render_markdown(text: &str, theme: &Theme) -> Vec<Line<'static>> {
                     Style::default().fg(theme.text_dim),
                 ));
             }
-            _ => {}
         }
     }
 
