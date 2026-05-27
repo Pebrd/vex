@@ -182,11 +182,7 @@ impl Cache {
             })
             .ok()?;
         let prs: Vec<PullRequest> = rows.filter_map(|r| r.ok()).collect();
-        if prs.is_empty() {
-            None
-        } else {
-            Some(prs)
-        }
+        if prs.is_empty() { None } else { Some(prs) }
     }
 
     pub fn set_prs(&self, owner: &str, repo: &str, prs: &[PullRequest]) {

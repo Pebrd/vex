@@ -1,9 +1,9 @@
 use crate::github::Issue;
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
-use ratatui::Frame;
 use std::collections::BTreeMap;
 
 pub struct RoadmapView {
@@ -34,7 +34,9 @@ impl RoadmapView {
                 continue;
             }
             if issue.labels.is_empty() {
-                map.entry("no label".to_string()).or_default().push(issue.clone());
+                map.entry("no label".to_string())
+                    .or_default()
+                    .push(issue.clone());
             } else {
                 for label in &issue.labels {
                     map.entry(label.clone()).or_default().push(issue.clone());
@@ -42,20 +44,24 @@ impl RoadmapView {
             }
         }
         self.groups = map.into_iter().collect();
-        self.list_states = self.groups.iter().map(|_| {
-            let mut s = ListState::default();
-            s.select(Some(0));
-            s
-        }).collect();
+        self.list_states = self
+            .groups
+            .iter()
+            .map(|_| {
+                let mut s = ListState::default();
+                s.select(Some(0));
+                s
+            })
+            .collect();
     }
 
     pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
-        let title = Paragraph::new(Line::from(vec![
-            Span::styled(
-                format!(" {}/{} — Roadmap ", self.owner, self.repo),
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-            ),
-        ]));
+        let title = Paragraph::new(Line::from(vec![Span::styled(
+            format!(" {}/{} — Roadmap ", self.owner, self.repo),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )]));
         frame.render_widget(title, area);
 
         if self.groups.is_empty() {
@@ -78,7 +84,11 @@ impl RoadmapView {
 
         for (idx, (label, issues)) in self.groups.iter().enumerate() {
             let is_selected = idx == self.selected_group;
-            let border_color = if is_selected { Color::Green } else { Color::DarkGray };
+            let border_color = if is_selected {
+                Color::Green
+            } else {
+                Color::DarkGray
+            };
             let title_text = format!(" {label} ({})", issues.len());
 
             let block = Block::default()
@@ -86,16 +96,21 @@ impl RoadmapView {
                 .title(title_text)
                 .border_style(Style::default().fg(border_color));
 
-            let items: Vec<ListItem> = issues.iter().map(|issue| {
-                ListItem::new(Line::from(Span::styled(
-                    format!("#{} {}", issue.number, issue.title),
-                    Style::default().fg(Color::White),
-                )))
-            }).collect();
+            let items: Vec<ListItem> = issues
+                .iter()
+                .map(|issue| {
+                    ListItem::new(Line::from(Span::styled(
+                        format!("#{} {}", issue.number, issue.title),
+                        Style::default().fg(Color::White),
+                    )))
+                })
+                .collect();
 
-            let list = List::new(items)
-                .block(block)
-                .highlight_style(Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD));
+            let list = List::new(items).block(block).highlight_style(
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            );
 
             if let Some(state) = self.list_states.get_mut(idx) {
                 if is_selected {

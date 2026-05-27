@@ -1,8 +1,8 @@
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
-use ratatui::Frame;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
@@ -107,7 +107,10 @@ impl FileBrowser {
     }
 
     pub fn selected_is_dir(&self) -> bool {
-        self.entries.get(self.selected).map(|e| e.is_dir).unwrap_or(false)
+        self.entries
+            .get(self.selected)
+            .map(|e| e.is_dir)
+            .unwrap_or(false)
     }
 
     pub fn draw(&self, frame: &mut Frame, area: Rect) {
@@ -123,7 +126,9 @@ impl FileBrowser {
         let path_str = self.current_dir.to_string_lossy();
         let path_display = Paragraph::new(Line::from(Span::styled(
             &*path_str,
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
         )));
         frame.render_widget(path_display, layout[0]);
 
@@ -139,7 +144,9 @@ impl FileBrowser {
                     "  "
                 };
                 let name_style = if e.is_dir {
-                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD)
                 } else {
                     Style::default().fg(Color::White)
                 };

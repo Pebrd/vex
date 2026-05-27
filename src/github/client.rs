@@ -1,6 +1,6 @@
 use super::{Comment, Issue, PullRequest};
-use anyhow::{Context, Result};
 use crate::config::{self, Config};
+use anyhow::{Context, Result};
 use serde::Deserialize;
 
 pub struct Client {
@@ -74,10 +74,7 @@ impl Client {
             .build()
             .expect("building reqwest client");
         let token = config::resolve_token(config);
-        Self {
-            token,
-            http,
-        }
+        Self { token, http }
     }
 
     fn github_get(&self, path: &str) -> reqwest::RequestBuilder {
@@ -156,7 +153,13 @@ impl Client {
                 author: pr.user.map(|u| u.login),
                 head_branch: pr.head.map(|b| b.r#ref),
                 base_branch: pr.base.map(|b| b.r#ref),
-                mergeable: pr.mergeable.map(|m| if m { "mergeable".to_string() } else { "conflict".to_string() }),
+                mergeable: pr.mergeable.map(|m| {
+                    if m {
+                        "mergeable".to_string()
+                    } else {
+                        "conflict".to_string()
+                    }
+                }),
                 checks_state,
                 created_at: pr.created_at,
                 updated_at: pr.updated_at,
@@ -166,16 +169,9 @@ impl Client {
         Ok(result)
     }
 
-    async fn get_checks_state(
-        &self,
-        owner: &str,
-        repo: &str,
-        pr_number: u64,
-    ) -> Result<String> {
+    async fn get_checks_state(&self, owner: &str, repo: &str, pr_number: u64) -> Result<String> {
         let status: GhCombinedStatus = self
-            .github_get(&format!(
-                "/repos/{owner}/{repo}/commits/{pr_number}/status"
-            ))
+            .github_get(&format!("/repos/{owner}/{repo}/commits/{pr_number}/status"))
             .send()
             .await
             .with_context(|| format!("fetching checks for PR #{pr_number}"))?
@@ -412,7 +408,13 @@ impl Client {
             author: pr.user.map(|u| u.login),
             head_branch: pr.head.map(|b| b.r#ref),
             base_branch: pr.base.map(|b| b.r#ref),
-            mergeable: pr.mergeable.map(|m| if m { "mergeable".to_string() } else { "conflict".to_string() }),
+            mergeable: pr.mergeable.map(|m| {
+                if m {
+                    "mergeable".to_string()
+                } else {
+                    "conflict".to_string()
+                }
+            }),
             checks_state,
             created_at: pr.created_at,
             updated_at: pr.updated_at,
@@ -437,7 +439,9 @@ impl Client {
 
         let issue: GhIssue = self
             .http
-            .patch(format!("https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}"))
+            .patch(format!(
+                "https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}"
+            ))
             .header("Authorization", format!("Bearer {}", self.token))
             .header("Accept", "application/vnd.github.v3+json")
             .json(&UpdateIssue {
@@ -505,7 +509,9 @@ impl Client {
 
         let labels: Vec<GhLabel> = self
             .http
-            .get(format!("https://api.github.com/repos/{owner}/{repo}/labels"))
+            .get(format!(
+                "https://api.github.com/repos/{owner}/{repo}/labels"
+            ))
             .header("Authorization", format!("Bearer {}", self.token))
             .header("Accept", "application/vnd.github.v3+json")
             .send()

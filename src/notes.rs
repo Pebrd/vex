@@ -102,7 +102,8 @@ fn read_note_file(path: &Path) -> Option<Note> {
         body,
         priority: get_field(&fields, "priority").unwrap_or_else(|| "medium".to_string()),
         status: get_field(&fields, "status").unwrap_or_else(|| "open".to_string()),
-        created_at: get_field(&fields, "created_at").unwrap_or_else(|| Local::now().format("%Y-%m-%d").to_string()),
+        created_at: get_field(&fields, "created_at")
+            .unwrap_or_else(|| Local::now().format("%Y-%m-%d").to_string()),
         issue,
     })
 }
@@ -146,7 +147,11 @@ pub fn create_note(
     let dir = ensure_notes_dir(project_dir)?;
     let now = Local::now().format("%Y-%m-%d").to_string();
     let base = slugify(title);
-    let slug = if base.is_empty() { format!("note-{now}") } else { base };
+    let slug = if base.is_empty() {
+        format!("note-{now}")
+    } else {
+        base
+    };
 
     let mut final_slug = slug.clone();
     let mut counter = 1;
@@ -181,7 +186,8 @@ pub fn update_note(
     let dir = ensure_notes_dir(project_dir)?;
     let path = dir.join(format!("{slug}.md"));
 
-    let existing = read_note_file(&path).ok_or_else(|| anyhow::anyhow!("note not found: {slug}"))?;
+    let existing =
+        read_note_file(&path).ok_or_else(|| anyhow::anyhow!("note not found: {slug}"))?;
 
     let note = Note {
         slug: slug.to_string(),

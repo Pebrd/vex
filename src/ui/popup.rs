@@ -1,8 +1,8 @@
+use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
-use ratatui::Frame;
 
 pub fn input_dialog(frame: &mut Frame, area: Rect, title: &str, value: &str, help: &str) {
     let popup = crate::ui::centered_rect(60, 20, area);
@@ -76,11 +76,7 @@ pub fn merge_dialog(frame: &mut Frame, area: Rect, selected: usize) {
         .style(Style::default().fg(Color::Cyan));
 
     let inner = block.inner(popup);
-    let methods = [
-        ("1", "merge commit"),
-        ("2", "squash"),
-        ("3", "rebase"),
-    ];
+    let methods = [("1", "merge commit"), ("2", "squash"), ("3", "rebase")];
 
     let items: Vec<Line> = methods
         .iter()

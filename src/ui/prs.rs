@@ -1,9 +1,9 @@
 use crate::github::{Comment, PullRequest};
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
-use ratatui::Frame;
 
 pub struct PRsView {
     pub prs: Vec<PullRequest>,
@@ -25,7 +25,13 @@ impl PRsView {
         }
     }
 
-    pub fn draw(&mut self, frame: &mut Frame, area: Rect, detail_pr: Option<&PullRequest>, comments: Option<&[Comment]>) {
+    pub fn draw(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        detail_pr: Option<&PullRequest>,
+        comments: Option<&[Comment]>,
+    ) {
         let layout = if detail_pr.is_some() {
             Layout::default()
                 .direction(Direction::Horizontal)
@@ -102,21 +108,25 @@ impl PRsView {
         }
     }
 
-    fn draw_detail(&mut self, frame: &mut Frame, area: Rect, pr: &PullRequest, comments: &[Comment]) {
+    fn draw_detail(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        pr: &PullRequest,
+        comments: &[Comment],
+    ) {
         let block = Block::default()
             .borders(Borders::ALL)
             .title(format!(" PR #{} ", pr.number))
             .style(Style::default().fg(Color::Cyan));
 
         let mut lines = vec![
-            Line::from(vec![
-                Span::styled(
-                    &pr.title,
-                    Style::default()
-                        .fg(Color::White)
-                        .add_modifier(Modifier::BOLD),
-                ),
-            ]),
+            Line::from(vec![Span::styled(
+                &pr.title,
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            )]),
             Line::from(vec![
                 Span::raw(" by "),
                 Span::styled(
@@ -175,7 +185,9 @@ impl PRsView {
             lines.push(Line::from(Span::raw("")));
             lines.push(Line::from(Span::styled(
                 format!("─── {} comments ───", comments.len()),
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
             )));
             lines.push(Line::from(Span::raw("")));
 
@@ -183,7 +195,9 @@ impl PRsView {
                 lines.push(Line::from(vec![
                     Span::styled(
                         comment.author.as_deref().unwrap_or("unknown"),
-                        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
                     ),
                     Span::styled(
                         format!("  {}", comment.created_at.as_deref().unwrap_or("")),

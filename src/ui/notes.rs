@@ -1,9 +1,9 @@
 use crate::notes::Note;
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
-use ratatui::Frame;
 
 pub struct NotesView {
     pub notes: Vec<Note>,
@@ -15,7 +15,11 @@ impl NotesView {
     pub fn new(notes: Vec<Note>) -> Self {
         let mut list_state = ListState::default();
         list_state.select(Some(0));
-        Self { notes, selected: 0, list_state }
+        Self {
+            notes,
+            selected: 0,
+            list_state,
+        }
     }
 
     pub fn draw(&mut self, frame: &mut Frame, area: Rect, detail: Option<&Note>) {
@@ -99,14 +103,12 @@ impl NotesView {
             .style(Style::default().fg(Color::Cyan));
 
         let mut lines = vec![
-            Line::from(vec![
-                Span::styled(
-                    &note.title,
-                    Style::default()
-                        .fg(Color::White)
-                        .add_modifier(Modifier::BOLD),
-                ),
-            ]),
+            Line::from(vec![Span::styled(
+                &note.title,
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            )]),
             Line::from(vec![
                 Span::styled(
                     &note.status,

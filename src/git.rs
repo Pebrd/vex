@@ -123,16 +123,14 @@ mod tests {
 
     #[test]
     fn test_parse_https_url() {
-        let info =
-            parse_github_url("https://github.com/pebrd/vex.git").unwrap();
+        let info = parse_github_url("https://github.com/pebrd/vex.git").unwrap();
         assert_eq!(info.owner, "pebrd");
         assert_eq!(info.repo, "vex");
     }
 
     #[test]
     fn test_parse_ssh_url() {
-        let info =
-            parse_github_url("git@github.com:pebrd/lumo.git").unwrap();
+        let info = parse_github_url("git@github.com:pebrd/lumo.git").unwrap();
         assert_eq!(info.owner, "pebrd");
         assert_eq!(info.repo, "lumo");
     }

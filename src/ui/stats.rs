@@ -1,9 +1,9 @@
 use crate::github::{Issue, PullRequest};
+use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
-use ratatui::Frame;
 
 pub struct StatsView {
     pub owner: String,
@@ -31,7 +31,11 @@ impl StatsView {
         let closed_issues = issues.iter().filter(|i| i.state == "closed").count();
         let open_prs = prs.iter().filter(|p| p.state == "open").count();
         let closed_prs = prs.iter().filter(|p| p.state == "closed").count();
-        let merged_prs = prs.iter().filter(|p| p.state == "merged" || p.state == "closed").count() - closed_prs;
+        let merged_prs = prs
+            .iter()
+            .filter(|p| p.state == "merged" || p.state == "closed")
+            .count()
+            - closed_prs;
 
         self.total_items = vec![
             format!("Issues (open): {open_issues}"),
@@ -46,12 +50,12 @@ impl StatsView {
     }
 
     pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
-        let title = Paragraph::new(Line::from(vec![
-            Span::styled(
-                format!(" {}/{} — Statistics ", self.owner, self.repo),
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-            ),
-        ]));
+        let title = Paragraph::new(Line::from(vec![Span::styled(
+            format!(" {}/{} — Statistics ", self.owner, self.repo),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )]));
         frame.render_widget(title, area);
 
         let block = Block::default()
@@ -80,7 +84,11 @@ impl StatsView {
 
         let list = List::new(items)
             .block(block)
-            .highlight_style(Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD))
+            .highlight_style(
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            )
             .highlight_symbol("> ");
 
         self.list_state.select(Some(self.selected));
