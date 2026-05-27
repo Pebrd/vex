@@ -3,6 +3,7 @@ mod cache;
 mod config;
 mod git;
 mod github;
+mod markdown;
 mod notes;
 mod theme;
 mod ui;

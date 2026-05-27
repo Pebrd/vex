@@ -1,3 +1,4 @@
+use crate::markdown;
 use crate::notes::Note;
 use crate::theme::Theme;
 use ratatui::Frame;
@@ -140,9 +141,8 @@ impl NotesView {
         }
 
         if let Some(body) = &note.body {
-            for line in body.lines() {
-                lines.push(Line::from(Span::raw(line)));
-            }
+            let body_lines = markdown::render_markdown(body, theme);
+            lines.extend(body_lines);
         }
 
         let detail = Paragraph::new(lines)

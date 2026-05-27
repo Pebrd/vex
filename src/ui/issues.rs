@@ -1,4 +1,5 @@
 use crate::github::{Comment, Issue};
+use crate::markdown;
 use crate::notes::Note;
 use crate::theme::Theme;
 use ratatui::Frame;
@@ -481,9 +482,8 @@ impl IssuesView {
         ];
 
         if let Some(body) = &issue.body {
-            for line in body.lines() {
-                lines.push(Line::from(Span::raw(line)));
-            }
+            let body_lines = markdown::render_markdown(body, theme);
+            lines.extend(body_lines);
         }
 
         if !comments.is_empty() {
@@ -510,9 +510,11 @@ impl IssuesView {
                     ),
                 ]));
                 if let Some(body) = &comment.body {
-                    for line in body.lines() {
-                        lines.push(Line::from(Span::raw(format!("  {line}"))));
+                    let mut comment_lines = markdown::render_markdown(body, theme);
+                    for line in &mut comment_lines {
+                        line.spans.insert(0, Span::raw("  "));
                     }
+                    lines.extend(comment_lines);
                 }
                 lines.push(Line::from(Span::raw("")));
             }
@@ -575,9 +577,8 @@ impl IssuesView {
         }
 
         if let Some(ref body) = note.body {
-            for line in body.lines() {
-                lines.push(Line::from(Span::raw(line)));
-            }
+            let body_lines = markdown::render_markdown(body, theme);
+            lines.extend(body_lines);
         }
 
         let detail = Paragraph::new(lines)
