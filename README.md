@@ -26,6 +26,7 @@ Terminal UI for GitHub issues and pull requests.
 - Dashboard warnings for projects with missing paths
 - Edit project directory from Dashboard (`e` key → file browser)
 - Open project in file explorer (`Ctrl+o`) or browser (`O`)
+- Git screen (`g`): stage/unstage files, commit, view log, branches, push/pull/fetch/stash
 
 ## Installation
 
@@ -77,6 +78,20 @@ vex will auto-detect the GitHub repo if you're in a git directory with a GitHub 
 | `Ctrl+t` | Open terminal in project directory |
 | `Ctrl+e` | Launch configured CLI tool |
 | `Ctrl+g` | Settings screen (select CLI tool) |
+| `g` | Git screen |
+| `Tab` | Toggle focus (git screen) |
+| `1`/`2`/`3` | Files / Commits / Branches mode |
+| `space` | Stage/unstage file |
+| `t` | Stage/unstage all |
+| `s` | Commit (opens commit modal) |
+| `d` | Discard file (unstaged) / delete branch |
+| `Enter` | View diff / checkout branch |
+| `p` | Pull |
+| `P` | Push |
+| `f` | Fetch |
+| `S` | Stash |
+| `Z` | Stash pop |
+| `n` | New branch |
 | `q` | Back |
 | `Q` | Quit |
 
@@ -111,6 +126,7 @@ vex add "Fix the login bug" --body "Investigate the auth flow" --priority high
 - [rusqlite](https://github.com/rusqlite/rusqlite) — SQLite (API cache only)
 - [serde](https://serde.rs) — serialization
 - [fuzzy-matcher](https://github.com/rapiz1/fuzzy-matcher) — fuzzy search
+- [git2](https://github.com/rust-lang/git2-rs) — git operations (staging, commit, log, branches, push/pull/stash)
 
 ## License
 

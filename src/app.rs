@@ -1169,6 +1169,7 @@ impl App {
             self.stats_view = StatsView::new(&project.owner, &project.repo);
             self.roadmap_view = RoadmapView::new(&project.owner, &project.repo);
             self.status = format!("{}/{}", project.owner, project.repo);
+            self.git_screen.set_repo_path(self.repo_path.clone());
             self.switch_to_issues().await?;
         }
         Ok(())
@@ -1901,6 +1902,7 @@ impl App {
                     self.stats_view = StatsView::new(&project.owner, &project.repo);
                     self.roadmap_view = RoadmapView::new(&project.owner, &project.repo);
                     self.status = format!("{}/{}", project.owner, project.repo);
+                    self.git_screen.set_repo_path(self.repo_path.clone());
                     self.switch_to_issues().await?;
                 }
             }

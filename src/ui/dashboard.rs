@@ -87,17 +87,13 @@ impl Dashboard {
                 let warning = if !exists {
                     Span::styled(
                         "⚠ ",
-                        Style::default()
-                            .fg(Color::Red)
-                            .add_modifier(Modifier::BOLD),
+                        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
                     )
                 } else {
                     Span::raw("  ")
                 };
                 let name_style = if !exists {
-                    Style::default()
-                        .fg(Color::Red)
-                        .add_modifier(Modifier::BOLD)
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
                 } else {
                     Style::default()
                         .fg(Color::Green)
