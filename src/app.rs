@@ -5,6 +5,7 @@ use crate::github::{Client, Comment, Issue, PullRequest};
 use crate::notes::{self, Note};
 use crate::ui::dashboard::Dashboard;
 use crate::ui::file_browser::FileBrowser;
+use crate::ui::git::GitScreen;
 use crate::ui::issues::{FocusTarget, IssuesView};
 use crate::ui::notes::NotesView;
 use crate::ui::prs::PRsView;
@@ -50,6 +51,7 @@ enum Screen {
     Stats,
     Roadmap,
     Settings,
+    Git,
 }
 
 #[derive(PartialEq)]
@@ -119,6 +121,12 @@ enum InputMode {
         private: bool,
         step: u8,
     },
+    GitCommit {
+        message: String,
+    },
+    GitConfirm {
+        action: String,
+    },
 }
 
 pub struct App {
@@ -167,6 +175,7 @@ pub struct App {
     #[allow(dead_code)]
     detected_clis: Vec<String>,
     settings_selected: usize,
+    pub git_screen: GitScreen,
 }
 
 impl App {
@@ -263,7 +272,12 @@ impl App {
             available_labels: Vec::new(),
             detected_clis,
             settings_selected,
+            git_screen: GitScreen::new(),
         };
+
+        if let Some(path) = &app.repo_path {
+            app.git_screen.set_repo_path(Some(path.clone()));
+        }
 
         if app.repo_owner.is_some() && app.repo_name.is_some() {
             app.switch_to_issues().await?;
@@ -277,6 +291,10 @@ impl App {
             app.repo_path = Some(std::path::PathBuf::from(path));
             app.status = format!("{owner}/{repo} (restored)");
             app.switch_to_issues().await?;
+        }
+
+        if let Some(path) = &app.repo_path {
+            app.git_screen.set_repo_path(Some(path.clone()));
         }
 
         Ok(app)
@@ -485,6 +503,7 @@ impl App {
             Screen::Stats => vec!["q back"],
             Screen::Roadmap => vec!["q back"],
             Screen::Settings => vec!["j/k select", "Enter choose", "q back"],
+            Screen::Git => self.git_screen.status_keys(),
         }
     }
 
@@ -531,6 +550,7 @@ impl App {
             Screen::Stats => self.stats_view.draw(frame, layout[0]),
             Screen::Roadmap => self.roadmap_view.draw(frame, layout[0]),
             Screen::Settings => self.draw_settings(frame, layout[0]),
+            Screen::Git => self.git_screen.draw(frame, layout[0]),
         }
 
         let repo_info = self
@@ -564,8 +584,7 @@ impl App {
         match &self.input_mode {
             InputMode::None => {}
             InputMode::Search { .. } => {}
-            InputMode::BrowseProject { browser }
-            | InputMode::EditProjectPath { browser, .. } => {
+            InputMode::BrowseProject { browser } | InputMode::EditProjectPath { browser, .. } => {
                 browser.draw(frame, frame.area());
             }
             InputMode::CreateNote { title, body, step } => {
@@ -631,6 +650,52 @@ impl App {
                 popup::input_dialog(frame, frame.area(), prompt, name, help);
             }
             InputMode::EditIssue { .. } | InputMode::EditNote { .. } => {}
+            InputMode::GitCommit { message } => {
+                let modal_area = crate::ui::centered_rect(50, 20, frame.area());
+                frame.render_widget(Clear, modal_area);
+                let lines = vec![
+                    Line::from(Span::styled(
+                        " Commit ",
+                        Style::default().add_modifier(Modifier::BOLD),
+                    )),
+                    Line::from(""),
+                    Line::from(Span::raw(message.clone())),
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        " [Enter] confirm  [Esc] cancel",
+                        Style::default().fg(Color::DarkGray),
+                    )),
+                ];
+                let text = Paragraph::new(lines).block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Cyan)),
+                );
+                frame.render_widget(text, modal_area);
+            }
+            InputMode::GitConfirm { action } => {
+                let modal_area = crate::ui::centered_rect(40, 20, frame.area());
+                frame.render_widget(Clear, modal_area);
+                let lines = vec![
+                    Line::from(Span::styled(
+                        " Confirm ",
+                        Style::default().add_modifier(Modifier::BOLD),
+                    )),
+                    Line::from(""),
+                    Line::from(Span::raw(format!("{action} changes?"))),
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        " [y] Yes  [n] No",
+                        Style::default().fg(Color::DarkGray),
+                    )),
+                ];
+                let text = Paragraph::new(lines).block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Red)),
+                );
+                frame.render_widget(text, modal_area);
+            }
         }
 
         if self.show_help {
@@ -771,6 +836,25 @@ impl App {
                 "Ctrl+t      open terminal",
                 "Ctrl+e      open CLI tool",
                 "Ctrl+g      settings",
+            ],
+            Screen::Git => vec![
+                "j/k         navigate",
+                "Tab         toggle focus",
+                "1           files mode",
+                "2           commits mode",
+                "3           branches mode",
+                "Enter       open diff / checkout",
+                "space       stage/unstage",
+                "t           toggle all",
+                "s           commit",
+                "d           discard / delete",
+                "p           pull",
+                "P           push",
+                "f           fetch",
+                "S           stash",
+                "Z           stash pop",
+                "n           new branch",
+                "q           back",
             ],
         };
 
@@ -1025,6 +1109,7 @@ impl App {
                     Screen::Stats => self.mouse_click_stats(mouse.column, mouse.row),
                     Screen::Roadmap => self.mouse_click_roadmap(mouse.column, mouse.row),
                     Screen::Settings => {}
+                    Screen::Git => {}
                 }
             }
             MouseEventKind::ScrollUp => {
@@ -1062,7 +1147,11 @@ impl App {
             return Ok(());
         }
         self.dashboard.selected = idx;
-        let project = self.dashboard.projects.get(self.dashboard.selected).cloned();
+        let project = self
+            .dashboard
+            .projects
+            .get(self.dashboard.selected)
+            .cloned();
         if let Some(project) = project {
             self.repo_owner = Some(project.owner.clone());
             self.repo_name = Some(project.repo.clone());
@@ -1305,6 +1394,7 @@ impl App {
                     .min(group_len.saturating_sub(1));
             }
             Screen::Settings => {}
+            Screen::Git => {}
         }
         Ok(())
     }
@@ -1363,6 +1453,7 @@ impl App {
                     (self.roadmap_view.selected_item + 1).min(group_len.saturating_sub(1));
             }
             Screen::Settings => {}
+            Screen::Git => {}
         }
         Ok(())
     }
@@ -1390,12 +1481,22 @@ impl App {
                     if self.config.selected_cli.is_some() {
                         self.open_cli();
                     } else {
-                        self.status = "no CLI configured — press Ctrl+g to open settings".to_string();
+                        self.status =
+                            "no CLI configured — press Ctrl+g to open settings".to_string();
                     }
                     return Ok(());
                 }
                 KeyCode::Char('g') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                     self.screen = Screen::Settings;
+                    return Ok(());
+                }
+                KeyCode::Char('g')
+                    if !key.modifiers.contains(KeyModifiers::CONTROL)
+                        && self.screen != Screen::Git =>
+                {
+                    self.screen = Screen::Git;
+                    self.git_screen.refresh();
+                    self.mark_dirty();
                     return Ok(());
                 }
                 _ => {}
@@ -1415,6 +1516,7 @@ impl App {
                     Screen::Stats => self.handle_stats_key(key).await?,
                     Screen::Roadmap => self.handle_roadmap_key(key).await?,
                     Screen::Settings => self.handle_settings_key(key).await?,
+                    Screen::Git => self.handle_git_key(key).await?,
                 },
                 InputMode::ConfirmMerge { .. } => self.handle_merge_key(key).await?,
                 InputMode::BrowseProject { .. } | InputMode::EditProjectPath { .. } => {
@@ -1427,6 +1529,9 @@ impl App {
                 | InputMode::Comment { .. } => self.handle_input_key(key).await?,
                 InputMode::CreateRepo { .. } => self.handle_create_repo_key(key).await?,
                 InputMode::EditIssue { .. } | InputMode::EditNote { .. } => unreachable!(),
+                InputMode::GitCommit { .. } | InputMode::GitConfirm { .. } => {
+                    self.handle_git_key(key).await?
+                }
             },
         }
         Ok(())
@@ -1713,6 +1818,7 @@ impl App {
                     | InputMode::LinkNote { .. }
                     | InputMode::EditIssue { .. }
                     | InputMode::EditNote { .. } => unreachable!(),
+                    InputMode::GitCommit { .. } | InputMode::GitConfirm { .. } => unreachable!(),
                 }
             }
             KeyCode::Backspace => {
@@ -1754,6 +1860,8 @@ impl App {
             | InputMode::EditIssue { .. }
             | InputMode::EditNote { .. } => None,
             InputMode::CreateRepo { .. } => None,
+            InputMode::GitCommit { message } => Some(message),
+            InputMode::GitConfirm { .. } => None,
         }
     }
 
@@ -1769,7 +1877,11 @@ impl App {
                 self.dashboard.selected = self.dashboard.selected.saturating_sub(1);
             }
             KeyCode::Enter => {
-                let project = self.dashboard.projects.get(self.dashboard.selected).cloned();
+                let project = self
+                    .dashboard
+                    .projects
+                    .get(self.dashboard.selected)
+                    .cloned();
                 if let Some(project) = project {
                     self.repo_owner = Some(project.owner.clone());
                     self.repo_name = Some(project.repo.clone());
@@ -1777,7 +1889,9 @@ impl App {
                     if let Some(ref resolved) = self.repo_path {
                         let resolved_str = resolved.to_string_lossy().to_string();
                         if resolved_str != project.path {
-                            if let Some(p) = self.dashboard.projects.get_mut(self.dashboard.selected) {
+                            if let Some(p) =
+                                self.dashboard.projects.get_mut(self.dashboard.selected)
+                            {
                                 p.path = resolved_str.clone();
                             }
                             self.config.projects = self.dashboard.projects.clone();
@@ -1846,7 +1960,8 @@ impl App {
                         browser,
                         project_idx: idx,
                     };
-                    self.status = "edit project path: browse to a git repo and press Enter".to_string();
+                    self.status =
+                        "edit project path: browse to a git repo and press Enter".to_string();
                 }
             }
             KeyCode::Char('o') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -2288,7 +2403,10 @@ impl App {
                     browser.selected =
                         (browser.selected + 1).min(browser.entries.len().saturating_sub(1));
                 }
-                if let InputMode::EditProjectPath { ref mut browser, .. } = self.input_mode {
+                if let InputMode::EditProjectPath {
+                    ref mut browser, ..
+                } = self.input_mode
+                {
                     browser.selected =
                         (browser.selected + 1).min(browser.entries.len().saturating_sub(1));
                 }
@@ -2297,7 +2415,10 @@ impl App {
                 if let InputMode::BrowseProject { ref mut browser } = self.input_mode {
                     browser.selected = browser.selected.saturating_sub(1);
                 }
-                if let InputMode::EditProjectPath { ref mut browser, .. } = self.input_mode {
+                if let InputMode::EditProjectPath {
+                    ref mut browser, ..
+                } = self.input_mode
+                {
                     browser.selected = browser.selected.saturating_sub(1);
                 }
             }
@@ -2341,7 +2462,8 @@ impl App {
                                 } else {
                                     p.parent().map(|x| x.to_path_buf()).unwrap_or(p)
                                 };
-                                self.update_project_path(idx, &dir.to_string_lossy()).await?;
+                                self.update_project_path(idx, &dir.to_string_lossy())
+                                    .await?;
                             }
                         }
                     }
@@ -2352,7 +2474,10 @@ impl App {
                     browser.show_hidden = !browser.show_hidden;
                     browser.refresh();
                 }
-                if let InputMode::EditProjectPath { ref mut browser, .. } = self.input_mode {
+                if let InputMode::EditProjectPath {
+                    ref mut browser, ..
+                } = self.input_mode
+                {
                     browser.show_hidden = !browser.show_hidden;
                     browser.refresh();
                 }
@@ -2364,7 +2489,10 @@ impl App {
                         self.input_mode = InputMode::None;
                     }
                 }
-                if let InputMode::EditProjectPath { ref mut browser, .. } = self.input_mode {
+                if let InputMode::EditProjectPath {
+                    ref mut browser, ..
+                } = self.input_mode
+                {
                     browser.go_up();
                     if browser.current_dir.parent().is_none() {
                         self.input_mode = InputMode::None;
@@ -3524,6 +3652,201 @@ impl App {
                     }
                 }
                 self.go_to_dashboard();
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    async fn handle_git_key(&mut self, key: event::KeyEvent) -> Result<()> {
+        match &self.input_mode {
+            InputMode::GitCommit { message } => {
+                match key.code {
+                    KeyCode::Esc => {
+                        self.input_mode = InputMode::None;
+                    }
+                    KeyCode::Enter => {
+                        let msg = message.clone();
+                        self.git_screen.commit(&msg);
+                        self.input_mode = InputMode::None;
+                        self.status = self.git_screen.status.clone();
+                    }
+                    KeyCode::Char(c) => {
+                        if let InputMode::GitCommit { ref mut message } = self.input_mode {
+                            message.push(c);
+                        }
+                    }
+                    KeyCode::Backspace => {
+                        if let InputMode::GitCommit { ref mut message } = self.input_mode {
+                            message.pop();
+                        }
+                    }
+                    _ => {}
+                }
+                return Ok(());
+            }
+            InputMode::GitConfirm { action } => {
+                match key.code {
+                    KeyCode::Char('y') | KeyCode::Enter => {
+                        let a = action.clone();
+                        self.input_mode = InputMode::None;
+                        match a.as_str() {
+                            "discard" => self.git_screen.discard_selected(),
+                            _ => {}
+                        }
+                        self.status = self.git_screen.status.clone();
+                    }
+                    KeyCode::Char('n') | KeyCode::Esc => {
+                        self.input_mode = InputMode::None;
+                    }
+                    _ => {}
+                }
+                return Ok(());
+            }
+            _ => {}
+        }
+
+        match &self.input_mode {
+            InputMode::None => {}
+            _ => return Ok(()),
+        }
+
+        match key.code {
+            KeyCode::Char('q') | KeyCode::Esc => {
+                self.go_to_dashboard();
+            }
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.git_screen.navigate_down();
+                self.mark_dirty();
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.git_screen.navigate_up();
+                self.mark_dirty();
+            }
+            KeyCode::Tab => {
+                self.git_screen.toggle_focus();
+                self.mark_dirty();
+            }
+            KeyCode::Char('1') => {
+                self.git_screen.set_mode(crate::ui::git::GitMode::Files);
+                self.mark_dirty();
+            }
+            KeyCode::Char('2') => {
+                self.git_screen.set_mode(crate::ui::git::GitMode::Commits);
+                self.mark_dirty();
+            }
+            KeyCode::Char('3') => {
+                self.git_screen.set_mode(crate::ui::git::GitMode::Branches);
+                self.mark_dirty();
+            }
+            KeyCode::Char(' ') if self.git_screen.mode == crate::ui::git::GitMode::Files => {
+                if self.git_screen.focus {
+                    let idx = self.git_screen.files_list_state.selected();
+                    if let Some(file) = idx.and_then(|i| self.git_screen.files.get(i)) {
+                        if file.staged {
+                            self.git_screen.unstage_selected();
+                        } else {
+                            self.git_screen.stage_selected();
+                        }
+                    }
+                }
+                self.mark_dirty();
+            }
+            KeyCode::Char('t') if self.git_screen.mode == crate::ui::git::GitMode::Files => {
+                let has_unstaged = self.git_screen.files.iter().any(|f| !f.staged);
+                if has_unstaged {
+                    self.git_screen.stage_all();
+                } else {
+                    self.git_screen.unstage_all();
+                }
+                self.mark_dirty();
+            }
+            KeyCode::Char('s') if self.git_screen.mode == crate::ui::git::GitMode::Files => {
+                self.input_mode = InputMode::GitCommit {
+                    message: String::new(),
+                };
+                self.mark_dirty();
+            }
+            KeyCode::Char('d') if self.git_screen.mode == crate::ui::git::GitMode::Files => {
+                let idx = self.git_screen.files_list_state.selected();
+                if let Some(file) = idx.and_then(|i| self.git_screen.files.get(i)) {
+                    if !file.staged {
+                        self.input_mode = InputMode::GitConfirm {
+                            action: "discard".to_string(),
+                        };
+                    }
+                }
+                self.mark_dirty();
+            }
+            KeyCode::Char('d') if self.git_screen.mode == crate::ui::git::GitMode::Branches => {
+                let idx = self.git_screen.branches_list_state.selected();
+                if let Some(branch) = idx.and_then(|i| self.git_screen.branches.get(i)) {
+                    if !branch.is_current {
+                        if let Some(path) = &self.git_screen.repo_path.clone() {
+                            if let Ok(repo) = crate::git::open_repo(path) {
+                                if crate::git::delete_branch(&repo, &branch.name).is_ok() {
+                                    self.status = format!("deleted branch {0}", branch.name);
+                                    self.git_screen.refresh();
+                                }
+                            }
+                        }
+                    }
+                }
+                self.mark_dirty();
+            }
+            KeyCode::Enter => {
+                if self.git_screen.mode == crate::ui::git::GitMode::Branches
+                    && self.git_screen.focus
+                {
+                    self.git_screen.checkout_selected_branch();
+                } else {
+                    self.git_screen.load_diff_for_selected();
+                }
+                self.status = self.git_screen.status.clone();
+                self.mark_dirty();
+            }
+            KeyCode::Char('n') if self.git_screen.mode == crate::ui::git::GitMode::Branches => {
+                if let Some(path) = &self.git_screen.repo_path.clone() {
+                    if let Ok(repo) = crate::git::open_repo(path) {
+                        let name = format!(
+                            "new-branch-{}",
+                            std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_secs()
+                        );
+                        if crate::git::create_branch(&repo, &name).is_ok() {
+                            self.status = format!("created branch {name}");
+                            self.git_screen.refresh();
+                        }
+                    }
+                }
+                self.mark_dirty();
+            }
+            KeyCode::Char('P') => {
+                self.git_screen.push();
+                self.status = self.git_screen.status.clone();
+                self.mark_dirty();
+            }
+            KeyCode::Char('p') => {
+                self.git_screen.pull();
+                self.status = self.git_screen.status.clone();
+                self.mark_dirty();
+            }
+            KeyCode::Char('f') => {
+                self.git_screen.fetch();
+                self.status = self.git_screen.status.clone();
+                self.mark_dirty();
+            }
+            KeyCode::Char('S') => {
+                self.git_screen.stash();
+                self.status = self.git_screen.status.clone();
+                self.mark_dirty();
+            }
+            KeyCode::Char('Z') => {
+                self.git_screen.stash_pop();
+                self.status = self.git_screen.status.clone();
+                self.mark_dirty();
             }
             _ => {}
         }
