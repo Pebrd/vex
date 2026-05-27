@@ -1,5 +1,6 @@
 pub mod dashboard;
 pub mod file_browser;
+pub mod git;
 pub mod issues;
 pub mod notes;
 pub mod popup;
