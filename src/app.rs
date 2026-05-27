@@ -514,14 +514,26 @@ impl App {
                 "/ search",
                 "q back",
             ],
-            Screen::Notes => vec![
-                "j/k navigate",
-                "n new",
-                "d delete",
-                "L link issue",
-                "/ search",
-                "q back",
-            ],
+            Screen::Notes => {
+                if self.notes_view.multi_select.active {
+                    vec![
+                        "V           exit multi",
+                        "space       toggle",
+                        "d           delete",
+                        "j/k navigate",
+                        "q back",
+                    ]
+                } else {
+                    vec![
+                        "j/k navigate",
+                        "n new",
+                        "d delete",
+                        "L link issue",
+                        "/ search",
+                        "q back",
+                    ]
+                }
+            }
             Screen::Stats => vec!["q back"],
             Screen::Roadmap => vec!["q back"],
             Screen::Settings => vec!["j/k select", "Enter choose", "q back"],
@@ -832,6 +844,8 @@ impl App {
                 "E           edit note",
                 "x           toggle open/closed",
                 "d           delete note",
+                "V           multi-select",
+                "space       toggle selection (multi)",
                 "Ctrl+t      open terminal",
                 "Ctrl+e      open CLI tool",
                 "Ctrl+g      settings",
@@ -2682,8 +2696,33 @@ impl App {
                     query: String::new(),
                 };
             }
+            KeyCode::Char(' ') => {
+                if self.notes_view.multi_select.active {
+                    self.notes_view
+                        .multi_select
+                        .toggle_item(self.notes_view.selected);
+                }
+            }
+            KeyCode::Char('V') => {
+                if self.notes_view.multi_select.active {
+                    self.notes_view.multi_select.clear();
+                    self.status = "exited multi-select".to_string();
+                } else {
+                    self.notes_view.multi_select.toggle();
+                    self.status = "multi-select: space to toggle, d to delete".to_string();
+                }
+            }
             KeyCode::Char('d') => {
-                self.delete_standalone_note().await?;
+                if self.notes_view.multi_select.active {
+                    let indices: Vec<usize> = self.notes_view.multi_select.selected_indices();
+                    if indices.is_empty() {
+                        self.status = "no notes selected".to_string();
+                    } else {
+                        self.delete_standalone_note_multi(indices).await?;
+                    }
+                } else {
+                    self.delete_standalone_note().await?;
+                }
             }
             _ => {}
         }
@@ -3368,6 +3407,31 @@ impl App {
                     Err(e) => self.status = format!("error: {e}"),
                 }
             }
+        }
+        Ok(())
+    }
+
+    async fn delete_standalone_note_multi(&mut self, indices: Vec<usize>) -> Result<()> {
+        self.resolve_project_path();
+        if let Some(ref path) = self.repo_path {
+            // Sort in reverse to preserve indices while deleting
+            let mut sorted = indices.clone();
+            sorted.sort_unstable_by(|a, b| b.cmp(a));
+            for idx in sorted {
+                if let Some(note) = self.notes_view.notes.get(idx) {
+                    let slug = note.slug.clone();
+                    let title = note.title.clone();
+                    if let Err(e) = notes::delete_note(path, &slug) {
+                        self.status = format!("error deleting '{}': {e}", title);
+                        return Ok(());
+                    }
+                }
+            }
+            let count = indices.len();
+            self.notes_view.multi_select.clear();
+            self.status = format!("deleted {count} notes");
+            self.selected_note = None;
+            self.refresh_notes().await?;
         }
         Ok(())
     }

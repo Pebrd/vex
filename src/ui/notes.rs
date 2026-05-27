@@ -6,10 +6,49 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
+use std::collections::HashSet;
+
+#[derive(Clone, Default)]
+pub struct MultiSelect {
+    pub active: bool,
+    pub selected: HashSet<usize>,
+}
+
+impl MultiSelect {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn toggle(&mut self) {
+        self.active = !self.active;
+    }
+
+    pub fn is_selected(&self, idx: usize) -> bool {
+        self.selected.contains(&idx)
+    }
+
+    pub fn toggle_item(&mut self, idx: usize) {
+        if !self.selected.insert(idx) {
+            self.selected.remove(&idx);
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.selected.clear();
+        self.active = false;
+    }
+
+    pub fn selected_indices(&self) -> Vec<usize> {
+        let mut v: Vec<_> = self.selected.iter().copied().collect();
+        v.sort();
+        v
+    }
+}
 
 pub struct NotesView {
     pub notes: Vec<Note>,
     pub selected: usize,
+    pub multi_select: MultiSelect,
     list_state: ListState,
 }
 
@@ -20,6 +59,7 @@ impl NotesView {
         Self {
             notes,
             selected: 0,
+            multi_select: MultiSelect::new(),
             list_state,
         }
     }
@@ -47,7 +87,8 @@ impl NotesView {
         let items: Vec<ListItem> = self
             .notes
             .iter()
-            .map(|n| {
+            .enumerate()
+            .map(|(idx, n)| {
                 let priority_style = match n.priority.as_str() {
                     "high" => Style::default().fg(theme.danger),
                     "medium" => Style::default().fg(theme.warning),
@@ -77,7 +118,21 @@ impl NotesView {
                     ));
                 }
 
-                ListItem::new(Line::from(spans))
+                if self.multi_select.active {
+                    let marker = if self.multi_select.is_selected(idx) {
+                        "● "
+                    } else {
+                        "○ "
+                    };
+                    spans.insert(0, Span::styled(marker, Style::default().fg(theme.accent)));
+                }
+
+                let mut line = Line::from(spans);
+                if self.multi_select.active && self.multi_select.is_selected(idx) {
+                    line = line.style(Style::default().bg(theme.selection));
+                }
+
+                ListItem::new(line)
             })
             .collect();
 
