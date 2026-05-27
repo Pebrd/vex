@@ -20,6 +20,12 @@ Terminal UI for GitHub issues and pull requests.
 - Quick capture CLI: `vex add <title> [--body "..."] [--priority high]`
 - Caches API responses offline
 - Works with any GitHub repo
+- Open terminal in project directory (`Ctrl+t`)
+- Launch configured CLI tool inside terminal (`Ctrl+e`, e.g. opencode, code, gh)
+- Settings screen to select default CLI (`Ctrl+g`, auto-detects tools from PATH)
+- Dashboard warnings for projects with missing paths
+- Edit project directory from Dashboard (`e` key → file browser)
+- Open project in file explorer (`Ctrl+o`) or browser (`O`)
 
 ## Installation
 
@@ -65,6 +71,12 @@ vex will auto-detect the GitHub repo if you're in a git directory with a GitHub 
 | `p` | Switch to PRs view |
 | `i` | Switch to Issues view |
 | `r` | Refresh |
+| `e` | Edit project path (Dashboard) |
+| `Ctrl+o` | Open project in file explorer |
+| `O` | Open project in browser |
+| `Ctrl+t` | Open terminal in project directory |
+| `Ctrl+e` | Launch configured CLI tool |
+| `Ctrl+g` | Settings screen (select CLI tool) |
 | `q` | Back |
 | `Q` | Quit |
 
@@ -74,6 +86,7 @@ Config file at `~/.config/vex/config.toml`:
 
 ```toml
 token = "ghp_..."  # optional — falls back to `gh auth token`
+selected_cli = "opencode"  # optional — for Ctrl+e launcher (auto-detected in settings)
 [[projects]]
 name = "my-project"
 path = "/home/user/projects/my-project"
@@ -81,7 +94,7 @@ owner = "myuser"
 repo = "my-repo"
 ```
 
-Projects are added automatically via the dashboard (`a` → file browser).
+Projects are added automatically via the dashboard (`a` → file browser). Use `e` on a project to edit its path. Configure the CLI launcher via `Ctrl+g` settings screen.
 
 ### Quick Capture
 
