@@ -5,7 +5,7 @@
 ```bash
 cargo build              # debug build
 cargo build --release    # release with LTO, single codegen-unit, stripped
-cargo test               # 3 tests (all in src/git.rs, URL parsing only)
+cargo test               # 7 tests (URL parsing + multi-select logic)
 cargo fmt && cargo clippy && cargo test   # preferred check order
 ```
 
@@ -26,13 +26,15 @@ Single binary, no workspaces. Entrypoint: `src/main.rs`.
 
 | Path | Role |
 |---|---|
-| `src/app.rs` | Main app loop, state machine, event dispatch (~3.5k loc, thickest file) |
+| `src/app.rs` | Main app loop, state machine, event dispatch (~4.1k loc, thickest file) |
 | `src/github/client.rs` | GitHub REST API client (reqwest + rustls, no native-tls) |
 | `src/cache.rs` | SQLite cache at `~/.local/share/vex/cache.db` (rusqlite bundled) |
 | `src/config.rs` | TOML config at `~/.config/vex/config.toml` |
-| `src/git.rs` | Git remote detection (walks parent dirs for `.git/config`) |
+| `src/git.rs` | Git operations via git2 (status, stage, commit, log, branch, push, pull, stash) |
 | `src/notes.rs` | Local `.vex/*.md` notes with YAML front matter (title, priority, status, issue link) |
-| `src/ui/` | TUI screens: dashboard, issues, PRs, notes, stats, roadmap, popups, file browser |
+| `src/theme.rs` | Theme system with 11 presets, hex/named color overrides |
+| `src/markdown.rs` | Markdown → ratatui styled Lines via pulldown-cmark |
+| `src/ui/` | TUI screens: dashboard, issues, PRs, notes, stats, roadmap, git, popups, file browser |
 
 ## Key details
 
@@ -45,7 +47,11 @@ Single binary, no workspaces. Entrypoint: `src/main.rs`.
 - **No generated code or build steps** — just `cargo build`
 - **Terminal launcher** (`Ctrl+t`): auto-detects terminal emulator (gnome-terminal, kitty, alacritty, xterm, wezterm, foot, konsole) and opens a terminal in project directory
 - **CLI launcher** (`Ctrl+e`): opens configured CLI tool (opencode, claude, code, gh, cursor, windsurf, claude-code) inside terminal in project directory
-- **Settings screen** (`Ctrl+g`): auto-detects CLIs from PATH, select with j/k/Enter, saved to `config.selected_cli`
+- **Settings screen** (`Ctrl+g`): auto-detects CLIs from PATH, select with j/k/Enter, saved to `config.selected_cli`; also lists 11 theme presets for selection, saved to `config.theme`
+- **Theme system**: 11 presets (Terminal, Monochrome, Amoled, CatppuccinMocha, GruvboxDark, Dracula, Nord, SolarizedDark, TokyoNight, OneDark, RosePine), configurable via `theme` key in config.toml, overridable per-color via `[theme.overrides]` with hex or named colors
+- **Git screen** (`g` key): dual-panel layout with Files/Commits/Branches modes (1/2/3 keys), staging, commit modal, push/pull/fetch/stash, diff viewer with syntax-colored lines
+- **Markdown rendering**: issue bodies, comments, and note bodies rendered via pulldown-cmark with styled headings, code blocks, lists, links, images, task lists
+- **Multi-select** (`V` key): bulk close/reopen issues, bulk stage/unstage git files, bulk delete git branches and notes
 - **Dashboard warnings**: projects whose stored path doesn't exist show `⚠` in red
 - **`e` key in Dashboard**: edit project path via file browser (`EditProjectPath` mode)
 
