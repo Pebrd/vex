@@ -1,5 +1,6 @@
 use crate::cache::Cache;
 use crate::config::{self, Config};
+use crate::diff;
 use crate::git;
 use crate::github::{Client, Comment, Issue, PullRequest};
 use crate::notes::{self, Note};
@@ -35,7 +36,7 @@ use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph};
+use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap};
 use std::collections::HashMap;
 use std::io::Stdout;
 use std::path::PathBuf;
@@ -53,6 +54,7 @@ enum Screen {
     Roadmap,
     Settings,
     Git,
+    PrDiff,
 }
 
 #[derive(PartialEq)]
@@ -178,6 +180,8 @@ pub struct App {
     settings_selected: usize,
     pub git_screen: GitScreen,
     pub theme: theme::Theme,
+    pub pr_diff: String,
+    pr_diff_loading: bool,
 }
 
 impl App {
@@ -281,6 +285,8 @@ impl App {
             settings_selected,
             theme,
             git_screen: GitScreen::new(),
+            pr_diff: String::new(),
+            pr_diff_loading: false,
         };
 
         if let Some(path) = &app.repo_path {
@@ -538,6 +544,7 @@ impl App {
             Screen::Roadmap => vec!["q back"],
             Screen::Settings => vec!["j/k select", "Enter choose", "q back"],
             Screen::Git => self.git_screen.status_keys(),
+            Screen::PrDiff => vec!["j/k scroll", "q back", "g dashboard"],
         }
     }
 
@@ -587,6 +594,9 @@ impl App {
             Screen::Roadmap => self.roadmap_view.draw(frame, layout[0], &self.theme),
             Screen::Settings => self.draw_settings(frame, layout[0]),
             Screen::Git => self.git_screen.draw(frame, layout[0], &self.theme),
+            Screen::PrDiff => {
+                self.draw_pr_diff(frame, layout[0]);
+            }
         }
 
         let repo_info = self
@@ -757,6 +767,33 @@ impl App {
         self.cli_count() + 1 + theme::ThemePreset::all().len()
     }
 
+    fn draw_pr_diff(&self, frame: &mut Frame, area: Rect) {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(" PR Diff ")
+            .border_style(Style::default().fg(self.theme.accent));
+
+        if self.pr_diff_loading {
+            let text = Paragraph::new("Loading diff...")
+                .style(Style::default().fg(self.theme.text_dim))
+                .block(block);
+            frame.render_widget(text, area);
+        } else if self.pr_diff.is_empty() {
+            let text = Paragraph::new("No diff available")
+                .style(Style::default().fg(self.theme.text_dim))
+                .block(block);
+            frame.render_widget(text, area);
+        } else {
+            let inner = block.inner(area);
+            let hunks = diff::parse_diff(&self.pr_diff);
+            let lines = diff::render_side_by_side(&hunks, &self.theme, inner.width as usize);
+            let text = Paragraph::new(lines)
+                .block(block)
+                .wrap(Wrap { trim: false });
+            frame.render_widget(text, area);
+        }
+    }
+
     fn draw_settings(&self, frame: &mut Frame, area: Rect) {
         let all_themes = theme::ThemePreset::all();
 
@@ -867,6 +904,7 @@ impl App {
                 "i           issues screen",
                 "s           stats screen",
                 "t           roadmap screen",
+                "d           view diff",
                 "r           refresh",
                 "g           dashboard",
             ],
@@ -929,6 +967,11 @@ impl App {
                 "Z           stash pop",
                 "n           new branch",
                 "q           back",
+            ],
+            Screen::PrDiff => vec![
+                "j/k         scroll diff",
+                "q           back to PRs",
+                "g           dashboard",
             ],
         };
 
@@ -1185,6 +1228,7 @@ impl App {
                     Screen::Roadmap => self.mouse_click_roadmap(mouse.column, mouse.row),
                     Screen::Settings => {}
                     Screen::Git => {}
+                    Screen::PrDiff => {}
                 }
             }
             MouseEventKind::ScrollUp => {
@@ -1471,6 +1515,9 @@ impl App {
             }
             Screen::Settings => {}
             Screen::Git => {}
+            Screen::PrDiff => {
+                self.detail_scroll = self.detail_scroll.saturating_sub(3);
+            }
         }
         Ok(())
     }
@@ -1530,6 +1577,9 @@ impl App {
             }
             Screen::Settings => {}
             Screen::Git => {}
+            Screen::PrDiff => {
+                self.detail_scroll = self.detail_scroll.saturating_add(3);
+            }
         }
         Ok(())
     }
@@ -1593,6 +1643,23 @@ impl App {
                     Screen::Roadmap => self.handle_roadmap_key(key).await?,
                     Screen::Settings => self.handle_settings_key(key).await?,
                     Screen::Git => self.handle_git_key(key).await?,
+                    Screen::PrDiff => {
+                        match key.code {
+                            KeyCode::Char('q') | KeyCode::Esc => {
+                                self.screen = Screen::PullRequests;
+                                self.pr_diff = String::new();
+                            }
+                            KeyCode::Char('j') | KeyCode::Down => {
+                                self.detail_scroll = self.detail_scroll.saturating_add(1);
+                            }
+                            KeyCode::Char('k') | KeyCode::Up => {
+                                self.detail_scroll = self.detail_scroll.saturating_sub(1);
+                            }
+                            KeyCode::Char('g') => self.go_to_dashboard(),
+                            _ => {}
+                        }
+                        return Ok(());
+                    }
                 },
                 InputMode::ConfirmMerge { .. } => self.handle_merge_key(key).await?,
                 InputMode::BrowseProject { .. } | InputMode::EditProjectPath { .. } => {
@@ -2517,6 +2584,20 @@ impl App {
             }
             KeyCode::Char('r') => {
                 self.refresh_prs().await?;
+            }
+            KeyCode::Char('d') => {
+                if let Some(ref pr) = self.selected_pr.clone() {
+                    self.pr_diff_loading = true;
+                    self.needs_redraw = true;
+                    if let (Some(owner), Some(repo)) = (&self.repo_owner, &self.repo_name) {
+                        match self.client.get_pr_diff(owner, repo, pr.number).await {
+                            Ok(diff) => self.pr_diff = diff,
+                            Err(e) => self.status = format!("error fetching diff: {e}"),
+                        }
+                    }
+                    self.pr_diff_loading = false;
+                    self.screen = Screen::PrDiff;
+                }
             }
             _ => {}
         }
