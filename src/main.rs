@@ -1,9 +1,9 @@
 mod app;
 mod cache;
 mod config;
+mod diff;
 mod git;
 mod github;
-mod diff;
 mod markdown;
 mod notes;
 mod theme;

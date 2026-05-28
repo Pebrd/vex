@@ -162,9 +162,17 @@ pub fn parse_diff(text: &str) -> Vec<DiffHunk> {
 /// Each hunk is rendered as:
 /// - A header line (styled with `theme.accent` + BOLD)
 /// - Rows of side-by-side old/new content separated by ` │ `
-pub fn render_side_by_side(hunks: &[DiffHunk], theme: &Theme, panel_width: usize) -> Vec<Line<'static>> {
+pub fn render_side_by_side(
+    hunks: &[DiffHunk],
+    theme: &Theme,
+    panel_width: usize,
+) -> Vec<Line<'static>> {
     let mut lines: Vec<Line<'static>> = Vec::new();
-    let col_width = if panel_width < 3 { 0 } else { (panel_width - 3) / 2 };
+    let col_width = if panel_width < 3 {
+        0
+    } else {
+        (panel_width - 3) / 2
+    };
 
     for hunk in hunks {
         // Header line
@@ -176,10 +184,7 @@ pub fn render_side_by_side(hunks: &[DiffHunk], theme: &Theme, panel_width: usize
         )));
 
         let row_count = hunk.old_lines.len().max(hunk.new_lines.len());
-        let separator = Span::styled(
-            " │ ",
-            Style::default().fg(theme.text_dim),
-        );
+        let separator = Span::styled(" │ ", Style::default().fg(theme.text_dim));
 
         for i in 0..row_count {
             let old_line = hunk.old_lines.get(i);
