@@ -364,6 +364,22 @@ impl Client {
         Ok(())
     }
 
+    pub async fn get_pr_diff(&self, owner: &str, repo: &str, number: u64) -> Result<String> {
+        let url = format!("https://api.github.com/repos/{owner}/{repo}/pulls/{number}");
+        let response = self
+            .http
+            .get(&url)
+            .header("User-Agent", "vex/0.1.0")
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Accept", "application/vnd.github.diff")
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            anyhow::bail!("GitHub API error: {}", response.status());
+        }
+        Ok(response.text().await?)
+    }
+
     pub async fn create_pr(
         &self,
         owner: &str,
