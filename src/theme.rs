@@ -195,6 +195,57 @@ impl ThemePreset {
             },
         }
     }
+
+    /// Return all theme presets (for settings UI)
+    pub fn all() -> &'static [ThemePreset] {
+        &[
+            Self::Terminal,
+            Self::Monochrome,
+            Self::Amoled,
+            Self::CatppuccinMocha,
+            Self::GruvboxDark,
+            Self::Dracula,
+            Self::Nord,
+            Self::SolarizedDark,
+            Self::TokyoNight,
+            Self::OneDark,
+            Self::RosePine,
+        ]
+    }
+
+    /// Config key string for this preset
+    pub fn config_key(&self) -> &'static str {
+        match self {
+            Self::Terminal => "terminal",
+            Self::Monochrome => "monochrome",
+            Self::Amoled => "amoled",
+            Self::CatppuccinMocha => "catppuccin",
+            Self::GruvboxDark => "gruvbox",
+            Self::Dracula => "dracula",
+            Self::Nord => "nord",
+            Self::SolarizedDark => "solarized",
+            Self::TokyoNight => "tokyo",
+            Self::OneDark => "onedark",
+            Self::RosePine => "rosepine",
+        }
+    }
+
+    /// Display name for UI
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            Self::Terminal => "Terminal",
+            Self::Monochrome => "Monochrome",
+            Self::Amoled => "Amoled",
+            Self::CatppuccinMocha => "Catppuccin Mocha",
+            Self::GruvboxDark => "Gruvbox Dark",
+            Self::Dracula => "Dracula",
+            Self::Nord => "Nord",
+            Self::SolarizedDark => "Solarized Dark",
+            Self::TokyoNight => "Tokyo Night",
+            Self::OneDark => "One Dark",
+            Self::RosePine => "Rosé Pine",
+        }
+    }
 }
 
 pub fn parse_theme(config_theme: &Option<String>, overrides: &HashMap<String, String>) -> Theme {

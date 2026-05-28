@@ -741,19 +741,53 @@ impl App {
         }
     }
 
+    fn cli_count(&self) -> usize {
+        self.detected_clis.len()
+    }
+
+    fn separator_index(&self) -> usize {
+        self.cli_count()
+    }
+
+    fn theme_start(&self) -> usize {
+        self.cli_count() + 1
+    }
+
+    fn total_settings_items(&self) -> usize {
+        self.cli_count() + 1 + theme::ThemePreset::all().len()
+    }
+
     fn draw_settings(&self, frame: &mut Frame, area: Rect) {
-        let items: Vec<ListItem> = self
-            .detected_clis
-            .iter()
-            .map(|cli| {
-                let is_selected = self.config.selected_cli.as_deref() == Some(cli.as_str());
-                let prefix = if is_selected { " ✓ " } else { "   " };
-                ListItem::new(Line::from(vec![
-                    Span::styled(prefix, Style::default().fg(self.theme.success)),
-                    Span::raw(cli),
-                ]))
-            })
-            .collect();
+        let all_themes = theme::ThemePreset::all();
+
+        let mut items: Vec<ListItem> = Vec::with_capacity(self.total_settings_items());
+
+        // CLIs
+        for cli in &self.detected_clis {
+            let is_selected = self.config.selected_cli.as_deref() == Some(cli.as_str());
+            let prefix = if is_selected { " ✓ " } else { "   " };
+            items.push(ListItem::new(Line::from(vec![
+                Span::styled(prefix, Style::default().fg(self.theme.success)),
+                Span::raw(cli),
+            ])));
+        }
+
+        // Separator
+        items.push(ListItem::new(Line::from(Span::styled(
+            " ─── Theme ───",
+            Style::default().fg(self.theme.text_dim),
+        ))));
+
+        // Themes
+        for preset in all_themes {
+            let current_key = self.config.theme.as_deref().unwrap_or("terminal");
+            let is_selected = preset.config_key() == current_key;
+            let prefix = if is_selected { " ✓ " } else { "   " };
+            items.push(ListItem::new(Line::from(vec![
+                Span::styled(prefix, Style::default().fg(self.theme.success)),
+                Span::raw(preset.display_name()),
+            ])));
+        }
 
         let mut list_state = ListState::default();
         list_state.select(Some(self.settings_selected));
@@ -768,7 +802,7 @@ impl App {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title(" Select CLI Tool ")
+                    .title(" Settings ")
                     .style(Style::default().fg(self.theme.accent)),
             );
 
@@ -3828,24 +3862,53 @@ impl App {
     }
 
     async fn handle_settings_key(&mut self, key: event::KeyEvent) -> Result<()> {
+        let total = self.total_settings_items();
+        let separator = self.separator_index();
+        let all_themes = theme::ThemePreset::all();
+
         match key.code {
             KeyCode::Char('q') | KeyCode::Esc => {
                 self.go_to_dashboard();
             }
             KeyCode::Char('j') | KeyCode::Down => {
-                self.settings_selected =
-                    (self.settings_selected + 1).min(self.detected_clis.len().saturating_sub(1));
+                let next = self.settings_selected + 1;
+                if next == separator {
+                    self.settings_selected = self.theme_start();
+                } else {
+                    self.settings_selected = next.min(total.saturating_sub(1));
+                }
             }
             KeyCode::Char('k') | KeyCode::Up => {
-                self.settings_selected = self.settings_selected.saturating_sub(1);
+                let prev = self.settings_selected.saturating_sub(1);
+                if prev == separator {
+                    self.settings_selected = self.cli_count().saturating_sub(1);
+                } else {
+                    self.settings_selected = prev;
+                }
             }
             KeyCode::Enter => {
-                if let Some(cli) = self.detected_clis.get(self.settings_selected) {
-                    self.config.selected_cli = Some(cli.clone());
-                    if let Err(e) = config::save(&self.config) {
-                        self.status = format!("error saving config: {e}");
-                    } else {
-                        self.status = format!("selected CLI: {cli}");
+                if self.settings_selected < self.cli_count() {
+                    // Select CLI
+                    if let Some(cli) = self.detected_clis.get(self.settings_selected) {
+                        self.config.selected_cli = Some(cli.clone());
+                        if let Err(e) = config::save(&self.config) {
+                            self.status = format!("error saving config: {e}");
+                        } else {
+                            self.status = format!("selected CLI: {cli}");
+                        }
+                    }
+                } else if self.settings_selected >= self.theme_start() {
+                    // Select theme
+                    let theme_idx = self.settings_selected - self.theme_start();
+                    if let Some(preset) = all_themes.get(theme_idx) {
+                        let key = preset.config_key();
+                        self.config.theme = Some(key.to_string());
+                        if let Err(e) = config::save(&self.config) {
+                            self.status = format!("error saving config: {e}");
+                        } else {
+                            self.theme = preset.colors();
+                            self.status = format!("theme: {}", preset.display_name());
+                        }
                     }
                 }
                 self.go_to_dashboard();
