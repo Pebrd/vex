@@ -1,3 +1,4 @@
+use crate::diff::{self, DiffHunk};
 use crate::git::{self, BranchInfo, CommitInfo, FileStatus};
 use crate::theme::Theme;
 use anyhow::Result;
@@ -67,7 +68,7 @@ pub struct GitScreen {
     pub commits_list_state: ListState,
     pub branches: Vec<BranchInfo>,
     pub branches_list_state: ListState,
-    pub diff_content: String,
+    pub diff_hunks: Vec<DiffHunk>,
     pub current_branch: String,
     pub loading: bool,
     pub status: String,
@@ -87,7 +88,7 @@ impl GitScreen {
             commits_list_state: ListState::default(),
             branches: Vec::new(),
             branches_list_state: ListState::default(),
-            diff_content: String::new(),
+            diff_hunks: Vec::new(),
             current_branch: String::new(),
             loading: false,
             status: String::new(),
@@ -578,7 +579,7 @@ impl GitScreen {
         frame.render_stateful_widget(list, area, &mut self.branches_list_state);
     }
 
-    fn draw_right_panel(&self, frame: &mut Frame, area: Rect, theme: &Theme) {
+    fn draw_right_panel(&mut self, frame: &mut Frame, area: Rect, theme: &Theme) {
         let title = match self.mode {
             GitMode::Files => "Diff (Working Tree)",
             GitMode::Commits => "Diff (Commit)",
@@ -586,28 +587,14 @@ impl GitScreen {
         };
         let block = self.right_block(title, theme);
 
-        if self.diff_content.is_empty() {
+        if self.diff_hunks.is_empty() {
             let text = Paragraph::new("Select an item to view diff")
                 .style(Style::default().fg(theme.text_dim))
                 .block(block);
             frame.render_widget(text, area);
         } else {
-            let lines: Vec<Line> = self
-                .diff_content
-                .lines()
-                .map(|line| {
-                    let style = if line.starts_with('+') {
-                        Style::default().fg(theme.success)
-                    } else if line.starts_with('-') {
-                        Style::default().fg(theme.danger)
-                    } else if line.starts_with("@@") {
-                        Style::default().fg(theme.accent)
-                    } else {
-                        Style::default()
-                    };
-                    Line::from(Span::styled(line.to_string(), style))
-                })
-                .collect();
+            let inner = block.inner(area);
+            let lines = diff::render_side_by_side(&self.diff_hunks, theme, inner.width as usize);
             let text = Paragraph::new(lines)
                 .block(block)
                 .wrap(Wrap { trim: false });
@@ -652,12 +639,13 @@ impl GitScreen {
                                         let _ = write!(buf, "{prefix}{content}");
                                         true
                                     });
-                                self.diff_content = String::from_utf8(buf).unwrap_or_default();
+                                let text = String::from_utf8(buf).unwrap_or_default();
+                                self.diff_hunks = diff::parse_diff(&text);
                                 return;
                             }
                         }
                     }
-                    self.diff_content = "(no diff available)".to_string();
+                    self.diff_hunks = Vec::new();
                 }
             }
             GitMode::Commits => {
@@ -666,13 +654,13 @@ impl GitScreen {
                     match git::open_repo(&repo_path)
                         .and_then(|r| git::get_commit_diff(&r, &commit.id))
                     {
-                        Ok(d) => self.diff_content = d,
-                        Err(_) => self.diff_content = String::new(),
+                        Ok(d) => self.diff_hunks = diff::parse_diff(&d),
+                        Err(_) => self.diff_hunks = Vec::new(),
                     }
                 }
             }
             GitMode::Branches => {
-                self.diff_content = String::new();
+                self.diff_hunks = Vec::new();
             }
         }
     }
@@ -784,6 +772,6 @@ impl GitScreen {
     pub fn set_mode(&mut self, mode: GitMode) {
         self.mode = mode;
         self.focus = true;
-        self.diff_content = String::new();
+        self.diff_hunks = Vec::new();
     }
 }
