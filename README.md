@@ -27,6 +27,11 @@ Terminal UI for GitHub issues and pull requests.
 - Edit project directory from Dashboard (`e` key → file browser)
 - Open project in file explorer (`Ctrl+o`) or browser (`O`)
 - Git screen (`g`): stage/unstage files, commit, view log, branches, push/pull/fetch/stash
+- Side-by-side diff viewer in Git screen and PR view (`Enter`)
+- Color themes with 11 presets (`Ctrl+g`), configurable via `config.toml`
+- Markdown rendering in issue bodies, comments, and notes
+- Multi-select for bulk operations: close/reopen issues, stage/unstage files, delete notes/branches (`V`)
+- Notes with YAML front-matter (title, priority, status, issue link)
 
 ## Installation
 
@@ -52,48 +57,127 @@ vex will auto-detect the GitHub repo if you're in a git directory with a GitHub 
 
 ### Keybindings
 
+#### Global
+
 | Key | Action |
 |---|---|
-| `j`/`k` | Navigate up/down |
-| `Tab` | Switch focus (issues ↔ notes) |
-| `Enter` | View inline comments |
-| `/` | Fuzzy search |
-| `c` | Create issue / create PR (in PRs view) |
-| `e` | Edit issue inline |
-| `x` | Toggle open/closed |
-| `o` | Add comment |
-| `n` | New note |
-| `L` | Link note to issue |
-| `d` | Delete note |
-| `m` | Merge PR (then 1=squash, 2=rebase, 3=merge) |
-| `f` | Cycle filter (open → all → closed) |
-| `s` | Stats view |
-| `t` | Roadmap view |
-| `p` | Switch to PRs view |
-| `i` | Switch to Issues view |
-| `r` | Refresh |
-| `e` | Edit project path (Dashboard) |
-| `Ctrl+o` | Open project in file explorer |
-| `O` | Open project in browser |
+| `?` | Toggle help screen |
+| `Q` | Quit |
+| `g` | Go to dashboard |
 | `Ctrl+t` | Open terminal in project directory |
 | `Ctrl+e` | Launch configured CLI tool |
-| `Ctrl+g` | Settings screen (select CLI tool) |
-| `g` | Git screen |
-| `Tab` | Toggle focus (git screen) |
-| `1`/`2`/`3` | Files / Commits / Branches mode |
-| `space` | Stage/unstage file |
+| `Ctrl+g` | Settings screen (themes, CLI tool) |
+| `0`-`9` | Quick-switch to project N (dashboard) |
+
+#### Dashboard
+
+| Key | Action |
+|---|---|
+| `j`/`k` | Navigate projects |
+| `Enter` | Open selected project |
+| `a` | Add project (opens file browser) |
+| `d` | Delete project |
+| `e` | Edit project path (opens file browser) |
+| `n` | Notes screen |
+| `s` | Stats view |
+| `t` | Roadmap view |
+| `Ctrl+o` | Open project in file explorer |
+
+#### Issues Screen
+
+| Key | Action |
+|---|---|
+| `j`/`k` | Navigate issues |
+| `Enter` | Open detail (loads comments) |
+| `Tab` | Toggle focus (issues ↔ notes) |
+| `/` | Fuzzy search |
+| `f` | Cycle filter (open → all → closed) |
+| `S` | Cycle sort order |
+| `l` | Cycle label filter |
+| `c` | Create issue |
+| `e` | Edit issue (title, body, labels) |
+| `x` | Toggle open/closed |
+| `o` | Add comment |
+| `n` | New linked note |
+| `L` | Link note to issue |
+| `d` | Delete linked note |
+| `O` | Open in browser |
+| `V` | Enter multi-select mode |
+| `r` | Refresh |
+| `p` | Switch to PRs view |
+| `Ctrl+d` / `Ctrl+u` | Scroll detail |
+| `mouse wheel` | Scroll detail |
+
+#### Pull Requests Screen
+
+| Key | Action |
+|---|---|
+| `j`/`k` | Navigate PRs |
+| `Enter` | View side-by-side diff |
+| `/` | Search |
+| `o` | Add comment |
+| `O` | Open in browser |
+| `m` | Merge PR (1=squash, 2=rebase, 3=merge) |
+| `c` | Create PR |
+| `r` | Refresh |
+| `i` | Switch to Issues view |
+
+#### Notes Screen
+
+| Key | Action |
+|---|---|
+| `j`/`k` | Navigate notes |
+| `Enter` | Open detail |
+| `/` | Search |
+| `n` | Create note |
+| `E` | Edit note |
+| `x` | Toggle open/closed |
+| `d` | Delete note |
+| `V` | Enter multi-select mode |
+| `L` | Link note to issue (detail view) |
+
+#### Git Screen
+
+| Key | Action |
+|---|---|
+| `j`/`k` | Navigate list |
+| `Tab` | Toggle focus (files/commits/branches ↔ diff) |
+| `1` | Files mode |
+| `2` | Commits mode |
+| `3` | Branches mode |
+| `Enter` | View diff (commits) / checkout branch |
+| `space` | Stage/unstage selected file |
 | `t` | Stage/unstage all |
-| `s` | Commit (opens commit modal) |
+| `s` | Open commit modal |
 | `d` | Discard file (unstaged) / delete branch |
-| `Enter` | View diff / checkout branch |
 | `p` | Pull |
 | `P` | Push |
 | `f` | Fetch |
 | `S` | Stash |
 | `Z` | Stash pop |
 | `n` | New branch |
-| `q` | Back |
-| `Q` | Quit |
+| `V` | Enter multi-select mode |
+
+#### Multi-Select Mode
+
+Active in Issues, Notes, and Git screens after pressing `V`.
+
+| Key | Action |
+|---|---|
+| `space` | Toggle selection on current item |
+| `V` | Exit multi-select mode |
+| `c` | Close selected issues (Issues) |
+| `r` | Reopen selected issues (Issues) |
+| `t` | Stage/unstage selected files (Git) |
+| `d` | Delete selected branches (Git) / notes (Notes) |
+
+#### Settings Screen (`Ctrl+g`)
+
+| Key | Action |
+|---|---|
+| `j`/`k` | Navigate settings list |
+| `Enter` | Select CLI tool or theme |
+| `Esc` / `q` | Back to dashboard |
 
 ### Configuration
 
