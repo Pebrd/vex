@@ -789,7 +789,8 @@ impl App {
             let lines = diff::render_side_by_side(&hunks, &self.theme, inner.width as usize);
             let text = Paragraph::new(lines)
                 .block(block)
-                .wrap(Wrap { trim: false });
+                .wrap(Wrap { trim: false })
+                .scroll((self.detail_scroll, 0));
             frame.render_widget(text, area);
         }
     }
